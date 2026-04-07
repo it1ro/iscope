@@ -1,4 +1,4 @@
-// src/game/InputController.ts (полный файл)
+// src/game/InputController.ts (полный файл с изменениями)
 
 import * as THREE from 'three';
 import { EventBus } from './EventBus';
@@ -18,7 +18,6 @@ export class InputController {
   private breathFreq = 1.8;
 
   // 🔧 ФЛАГ ВРЕМЕННОГО ОТКЛЮЧЕНИЯ ДЫХАНИЯ
-  // Установите true, когда потребуется включить колебания прицела для усложнённых режимов
   private enableBreathing = false;
 
   // scope settings
@@ -54,7 +53,7 @@ export class InputController {
       if (e.button === 0 && this.mouseLocked) {
         e.preventDefault();
         this.recoilImpulse = 0.04;
-        const pos = this.getPosition();
+        const pos = this.getMuzzlePosition(); // 🔁 новая точка вылета
         const dir = new THREE.Vector3();
         this.getDirection(dir);
         this.eventBus.emit({ type: 'shoot', startPos: pos, direction: dir });
@@ -86,7 +85,6 @@ export class InputController {
   public update(time: number): void {
     if (!this.mouseLocked) return;
 
-    // Дыхание: отключаем, пока флаг выключен. Оставим для будущих режимов.
     const sway = this.enableBreathing
       ? Math.sin(time * this.breathFreq) * this.breathAmp
       : 0;
@@ -106,6 +104,16 @@ export class InputController {
 
   public getPosition(): THREE.Vector3 {
     return this.camera.position.clone();
+  }
+
+  /**
+   * Возвращает точку вылета пули со смещением 5 см вниз относительно камеры
+   * (имитация высоты прицела над осью ствола).
+   */
+  public getMuzzlePosition(): THREE.Vector3 {
+    const pos = this.camera.position.clone();
+    pos.y -= 0.05; // 5 см вниз
+    return pos;
   }
 
   public isInScope(): boolean {
