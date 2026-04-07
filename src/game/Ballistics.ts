@@ -1,19 +1,32 @@
+// src/game/Ballistics.ts
 import * as THREE from 'three';
 import { BulletState, Target, GameEvent } from '../types';
 import { EventBus } from './EventBus';
 
+/**
+ * Ballistics
+ * Реалистичная модель полёта пули с субстеппингом, учётом сопротивления воздуха и ветра.
+ * Параметры по умолчанию подобраны под SVD / 7.62x54R (примерные средние значения).
+ */
 export class Ballistics {
   private bullet: BulletState | null = null;
   private scene: THREE.Scene;
   private eventBus: EventBus;
   private raycaster = new THREE.Raycaster();
-  private readonly bulletSpeed = 280;
-  private readonly gravity = 9.81;
-  private readonly drag = 0.012;
-  private readonly wind = new THREE.Vector3(0.3, 0, 0.1);
+
+  // --- Weapon / bullet physical params (SVD / 7.62x54R typical)
+  private readonly muzzleVelocity = 830; // m/s
+  private readonly bulletMass = 0.0096; // kg (9.6 g)
+  private readonly bulletDiameter = 0.00762; // m (7.62 mm)
+  private readonly BC = 0.34; // G1 ballistic coefficient (approx)
+  private readonly airDensity = 1.225; // kg/m^3 (sea level, 15°C)
+  private readonly gravity = 9.81; // m/s^2
+  private readonly wind = new THREE.Vector3(0.3, 0, 0.1); // m/s (wind velocity vector)
+  // fallback Cd if BC-based estimation not used
+  private readonly fallbackCd = 0.295;
 
   // Trail
-  private readonly MAX_TRAIL = 60;
+  private readonly MAX_TRAIL = 120;
   private trailBuffer = new Float32Array(this.MAX_TRAIL * 3);
   private trailCount = 0;
   private trailGeo: THREE.BufferGeometry;
@@ -23,6 +36,9 @@ export class Ballistics {
   // Reusable temporaries to avoid allocations
   private tmpDir = new THREE.Vector3();
   private tmpDistVec = new THREE.Vector3();
+  private tmpRelVel = new THREE.Vector3();
+  private tmpDrag = new THREE.Vector3();
+  private tmpGrav = new THREE.Vector3(0, -this.gravity, 0);
 
   // Event handler reference for unsubscribe
   private shootHandler: (e: GameEvent) => void;
@@ -64,6 +80,7 @@ export class Ballistics {
 
   /**
    * Fire a single bullet. Returns false if a bullet is already active.
+   * startPos and direction are in scene units (assumed meters).
    */
   public shoot(startPos: THREE.Vector3, direction: THREE.Vector3): boolean {
     if (this.bullet?.active) return false;
@@ -85,7 +102,7 @@ export class Ballistics {
     this.bullet = {
       mesh,
       light,
-      velocity: direction.clone().normalize().multiplyScalar(this.bulletSpeed),
+      velocity: direction.clone().normalize().multiplyScalar(this.muzzleVelocity),
       prevPosition: startPos.clone(),
       startTime: performance.now(),
       active: true
@@ -102,18 +119,45 @@ export class Ballistics {
 
   /**
    * Update physics and collision. dt in seconds.
+   * Uses substepping to keep simulation stable at high muzzle velocities.
    */
   public update(dt: number, targets: Target[]): void {
     if (!this.bullet?.active) return;
     const { velocity, mesh, prevPosition } = this.bullet;
 
-    // Physics integration (semi-implicit Euler)
-    velocity.y -= this.gravity * dt;
-    velocity.multiplyScalar(1 - this.drag * dt);
-    velocity.addScaledVector(this.wind, dt);
+    // Substepping: aim for ~240-300 Hz internal updates for accuracy
+    const maxStep = 1 / 240; // ~0.004166...
+    const substeps = Math.max(1, Math.ceil(dt / maxStep));
+    const step = dt / substeps;
 
-    // Move bullet
-    mesh.position.addScaledVector(velocity, dt);
+    const area = this.getCrossSectionArea();
+
+    for (let s = 0; s < substeps; s++) {
+      // Relative velocity to wind (wind is a velocity vector)
+      this.tmpRelVel.copy(velocity).sub(this.wind);
+      const relSpeed = this.tmpRelVel.length();
+
+      if (relSpeed > 1e-6) {
+        // Estimate drag coefficient (Cd). For more accuracy, replace with BC->Cd mapping or table.
+        const Cd = this.estimateCdFromBC(relSpeed) ?? this.fallbackCd;
+
+        // Drag acceleration magnitude: (rho * Cd * A * v^2) / (2 * m)
+        const dragAccMag = (this.airDensity * Cd * area * relSpeed * relSpeed) / (2 * this.bulletMass);
+
+        // Drag vector: opposite to relative velocity
+        this.tmpDrag.copy(this.tmpRelVel).multiplyScalar(-dragAccMag / relSpeed);
+
+        // Integrate accelerations: gravity + drag
+        // semi-implicit Euler: v += a * dt; pos += v * dt
+        velocity.addScaledVector(this.tmpDrag, step);
+      }
+
+      // gravity
+      velocity.addScaledVector(this.tmpGrav, step);
+
+      // integrate position
+      mesh.position.addScaledVector(velocity, step);
+    }
 
     // Compute displacement and direction between previous and current position
     this.tmpDistVec.copy(mesh.position).sub(prevPosition);
@@ -133,12 +177,10 @@ export class Ballistics {
       let cached = this.targetMeshCache.get(t);
       if (!cached) {
         cached = [];
-        // If Target exposes collisionMeshes, prefer that
         const anyT = t as any;
         if (Array.isArray(anyT.collisionMeshes) && anyT.collisionMeshes.length > 0) {
           cached.push(...anyT.collisionMeshes);
         } else {
-          // traverse once and cache meshes
           t.mesh.traverse((obj) => {
             if ((obj as THREE.Mesh).isMesh) cached!.push(obj);
           });
@@ -165,6 +207,16 @@ export class Ballistics {
           obj = obj.parent;
         }
 
+        if (!foundTarget) {
+          // try parent chain if not found yet
+          obj = hit.object.parent;
+          while (obj) {
+            foundTarget = targets.find(t => t.mesh === obj);
+            if (foundTarget) break;
+            obj = obj.parent;
+          }
+        }
+
         if (foundTarget) {
           this.eventBus.emit({
             type: 'bullet_hit',
@@ -173,23 +225,7 @@ export class Ballistics {
             hitPoint: hit.point
           } as any);
         } else {
-          // If no target found by exact group match, try to match by parent chain to any target.mesh
-          obj = hit.object.parent;
-          while (obj) {
-            foundTarget = targets.find(t => t.mesh === obj);
-            if (foundTarget) break;
-            obj = obj.parent;
-          }
-          if (foundTarget) {
-            this.eventBus.emit({
-              type: 'bullet_hit',
-              target: foundTarget,
-              distance: mesh.position.distanceTo(foundTarget.position),
-              hitPoint: hit.point
-            } as any);
-          } else {
-            console.warn('Попадание в объект, но цель не найдена');
-          }
+          console.warn('Попадание в объект, но цель не найдена');
         }
 
         this.cleanup();
@@ -200,12 +236,12 @@ export class Ballistics {
     // Update prevPosition after raycast
     prevPosition.copy(mesh.position);
 
-    // Lifetime / bounds checks
+    // Lifetime / bounds checks (safety)
     if (
       mesh.position.y < -0.2 ||
       Math.abs(mesh.position.x) > 120 ||
       mesh.position.z > 160 ||
-      (performance.now() - this.bullet.startTime) > 4000
+      (performance.now() - this.bullet.startTime) > 8000 // увеличил таймаут для дальних выстрелов
     ) {
       this.cleanup();
     }
@@ -238,7 +274,6 @@ export class Ballistics {
    */
   private cleanup(): void {
     if (!this.bullet) {
-      // still emit miss to keep behavior consistent
       this.eventBus.emit({ type: 'bullet_miss' } as any);
       return;
     }
@@ -291,5 +326,33 @@ export class Ballistics {
 
     // Clear caches
     this.targetMeshCache = new WeakMap();
+  }
+
+  // ----------------- Helpers -----------------
+
+  private getCrossSectionArea(): number {
+    const r = this.bulletDiameter / 2;
+    return Math.PI * r * r;
+  }
+
+  /**
+   * Простая аппроксимация Cd по BC/скорости.
+   * Для точности лучше заменить на таблицу G1/G7 drag-коэффициентов.
+   * Возвращает null если не удалось оценить — тогда используется fallbackCd.
+   */
+  private estimateCdFromBC(speed: number): number | null {
+    // Упрощённая эвристика: более высокие BC -> меньший Cd.
+    // Это грубая аппроксимация, но даёт реалистичную динамику.
+    // BC типично 0.2..0.5 -> Cd ~ 0.35..0.25
+    const bc = this.BC;
+    if (!bc || bc <= 0) return null;
+    // map BC [0.2, 0.5] -> Cd [0.36, 0.24]
+    const minBC = 0.2;
+    const maxBC = 0.5;
+    const minCd = 0.24;
+    const maxCd = 0.36;
+    const t = Math.min(1, Math.max(0, (bc - minBC) / (maxBC - minBC)));
+    const cd = maxCd + (minCd - maxCd) * t;
+    return cd;
   }
 }
