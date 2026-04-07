@@ -1,35 +1,40 @@
 import * as THREE from 'three';
+import { GameEvent } from '../types';
+import { EventBus } from './EventBus';
 
 export class Effects {
-    private scene: THREE.Scene;
+  private scene: THREE.Scene;
+  constructor(scene: THREE.Scene, eventBus: EventBus) {
+    this.scene = scene;
+    eventBus.on('bullet_hit', () => this.spawnHitMarker());
+  }
 
-    constructor(scene: THREE.Scene) {
-        this.scene = scene;
+  private spawnHitMarker(): void {
+    const el = document.createElement('div'); el.className = 'hit-marker';
+    document.body.appendChild(el); setTimeout(() => el.remove(), 250);
+  }
+
+  spawnImpactParticles(pos: THREE.Vector3): void {
+    const count = 12;
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const vels: THREE.Vector3[] = [];
+    for (let i = 0; i < count; i++) {
+      positions[i*3] = pos.x; positions[i*3+1] = pos.y; positions[i*3+2] = pos.z;
+      vels.push(new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(3));
     }
-
-    public muzzleFlash(): void {
-        const muzzleDiv = document.createElement('div');
-        muzzleDiv.className = 'shot-muzzle';
-        document.body.appendChild(muzzleDiv);
-        setTimeout(() => muzzleDiv.remove(), 100);
-    }
-
-    public cameraShake(): void {
-        document.body.classList.add('shake-effect');
-        setTimeout(() => document.body.classList.remove('shake-effect'), 150);
-    }
-
-    public hitEffect(position: THREE.Vector3): void {
-        const hitMarker = document.createElement('div');
-        hitMarker.className = 'hit-marker';
-        document.body.appendChild(hitMarker);
-        setTimeout(() => hitMarker.remove(), 220);
-
-        const particleGeo = new THREE.SphereGeometry(0.12, 6, 6);
-        const particleMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff2200 });
-        const particle = new THREE.Mesh(particleGeo, particleMat);
-        particle.position.copy(position);
-        this.scene.add(particle);
-        setTimeout(() => this.scene.remove(particle), 200);
-    }
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({ color: 0xffaa44, size: 0.15, transparent: true, opacity: 0.9 });
+    const pts = new THREE.Points(geo, mat);
+    this.scene.add(pts);
+    const start = performance.now();
+    const tick = () => {
+      const t = (performance.now() - start) / 1000;
+      if (t > 0.3) { this.scene.remove(pts); geo.dispose(); mat.dispose(); return; }
+      const arr = geo.attributes.position.array as Float32Array;
+      for(let i=0;i<count;i++) { arr[i*3]+=vels[i].x*0.016; arr[i*3+1]+=vels[i].y*0.016-9.81*t*0.016; arr[i*3+2]+=vels[i].z*0.016; }
+      geo.attributes.position.needsUpdate = true; mat.opacity = 1 - t/0.3;
+      requestAnimationFrame(tick);
+    }; tick();
+  }
 }

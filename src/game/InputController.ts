@@ -1,48 +1,63 @@
 import * as THREE from 'three';
+import { EventBus } from './EventBus';
 
 export class InputController {
-    private camera: THREE.PerspectiveCamera;
-    private onShoot: () => void;
-    private mouseLocked: boolean = false;
-    private yaw: number = -0.2;
-    private pitch: number = 0.15;
-    private sensitivity: number = 0.0022;
+  private canvas: HTMLCanvasElement;
+  private camera: THREE.PerspectiveCamera;
+  private eventBus: EventBus;
+  private mouseLocked = false;
+  private yaw = 0;
+  private pitch = 0.15;
+  private sensitivity = 0.0022;
+  private recoilImpulse = 0;
+  private zoomLevel = 1;
+  private breathAmp = 0.004;
+  private breathFreq = 1.8;
 
-    constructor(camera: THREE.PerspectiveCamera, onShoot: () => void) {
-        this.camera = camera;
-        this.onShoot = onShoot;
-        this.setupEventListeners();
-    }
+  constructor(canvas: HTMLCanvasElement, camera: THREE.PerspectiveCamera, eventBus: EventBus) {
+    this.canvas = canvas;
+    this.camera = camera;
+    this.eventBus = eventBus;
+    this.setupListeners();
+  }
 
-    private setupEventListeners(): void {
-        const canvas = this.camera.parent?.parent?.querySelector('canvas') || document.querySelector('canvas');
-        if (canvas) {
-            canvas.addEventListener('click', () => canvas.requestPointerLock());
-        }
-        document.addEventListener('pointerlockchange', () => this.lockChange());
-        window.addEventListener('mousemove', (e) => this.onMouseMove(e));
-        window.addEventListener('mousedown', (e) => {
-            if (e.button === 0 && this.mouseLocked) {
-                e.preventDefault();
-                this.onShoot();
-            }
-        });
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.mouseLocked) document.exitPointerLock();
-        });
-    }
+  private setupListeners(): void {
+    this.canvas.addEventListener('click', () => this.canvas.requestPointerLock());
+    document.addEventListener('pointerlockchange', () => { this.mouseLocked = !!document.pointerLockElement; });
 
-    private lockChange(): void {
-        this.mouseLocked = document.pointerLockElement !== null;
-    }
+    document.addEventListener('mousemove', (e) => {
+      if (!this.mouseLocked) return;
+      this.yaw -= e.movementX * this.sensitivity;
+      this.pitch -= e.movementY * this.sensitivity;
+      this.pitch = THREE.MathUtils.clamp(this.pitch, -Math.PI / 2.4, Math.PI / 2.4);
+    });
 
-    private onMouseMove(e: MouseEvent): void {
-        if (!this.mouseLocked) return;
-        this.yaw -= e.movementX * this.sensitivity;
-        this.pitch -= e.movementY * this.sensitivity;
-        this.pitch = Math.max(-Math.PI / 2.4, Math.min(Math.PI / 2.4, this.pitch));
-        this.camera.rotation.order = 'YXZ';
-        this.camera.rotation.y = this.yaw;
-        this.camera.rotation.x = this.pitch;
-    }
+    document.addEventListener('mousedown', (e) => {
+      if (e.button === 0 && this.mouseLocked) {
+        e.preventDefault();
+        this.recoilImpulse = 0.04;
+        const pos = this.getPosition();
+        const dir = new THREE.Vector3();
+        this.getDirection(dir);
+        this.eventBus.emit({ type: 'shoot', startPos: pos, direction: dir });
+      }
+    });
+
+    document.addEventListener('wheel', (e) => {
+      if (!this.mouseLocked) return;
+      this.zoomLevel = THREE.MathUtils.clamp(this.zoomLevel - e.deltaY * 0.001, 1, 3);
+      this.camera.fov = THREE.MathUtils.lerp(75, 15, (this.zoomLevel - 1) / 2);
+      this.camera.updateProjectionMatrix();
+    });
+  }
+
+  public update(time: number): void {
+    if (!this.mouseLocked) return;
+    const sway = Math.sin(time * this.breathFreq) * this.breathAmp;
+    this.recoilImpulse = THREE.MathUtils.lerp(this.recoilImpulse, 0, 0.15);
+    this.camera.rotation.set(this.pitch + sway + this.recoilImpulse, this.yaw, 0);
+  }
+
+  public getDirection(out: THREE.Vector3): void { this.camera.getWorldDirection(out); }
+  public getPosition(): THREE.Vector3 { return this.camera.position.clone(); }
 }
