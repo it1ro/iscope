@@ -38,49 +38,55 @@ export class SceneManager {
   }
 
   private setupLights(): void {
-    // Ambient базовое освещение
-    this.scene.add(new THREE.AmbientLight(0x404060, 0.4));
+  this.scene.add(new THREE.AmbientLight(0x404060, 0.4));
 
-    // Основной направленный свет (солнце)
-    this.sunLight = new THREE.DirectionalLight(0xfff5d1, 1.5);
-    this.sunLight.position.set(30, 40, 20);
-    this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.set(2048, 2048);
-    this.sunLight.shadow.camera.near = 1;
-    this.sunLight.shadow.camera.far = 100;
-    this.sunLight.shadow.camera.left = -30;
-    this.sunLight.shadow.camera.right = 30;
-    this.sunLight.shadow.camera.top = 30;
-    this.sunLight.shadow.camera.bottom = -30;
-    this.sunLight.shadow.bias = -0.0005;
-    this.scene.add(this.sunLight);
+  // Солнце за спиной игрока (светит в сторону положительной Z)
+  this.sunLight = new THREE.DirectionalLight(0xfff5d1, 1.8);
+  this.sunLight.position.set(0, 35, -40);      // за камерой (0,0,0)
+  this.sunLight.target.position.set(0, 0, 40); // цель впереди
+  this.scene.add(this.sunLight.target);
+  
+  this.sunLight.castShadow = true;
+  this.sunLight.shadow.mapSize.set(2048, 2048);
+  this.sunLight.shadow.camera.near = 1;
+  this.sunLight.shadow.camera.far = 120;
+  this.sunLight.shadow.camera.left = -40;
+  this.sunLight.shadow.camera.right = 40;
+  this.sunLight.shadow.camera.top = 40;
+  this.sunLight.shadow.camera.bottom = -40;
+  this.sunLight.shadow.bias = -0.0005;
+  this.scene.add(this.sunLight);
 
-    // Заполняющий свет
-    const fill1 = new THREE.PointLight(0x446688, 0.3, 60);
-    fill1.position.set(-10, 8, -15);
-    this.scene.add(fill1);
-
-    const fill2 = new THREE.PointLight(0xffaa66, 0.4, 50);
-    fill2.position.set(15, 6, -20);
-    this.scene.add(fill2);
-  }
+  // заполняющий свет спереди, чтобы лица мишеней не были совсем чёрными
+  const fillFront = new THREE.PointLight(0xccddff, 0.35, 80);
+  fillFront.position.set(0, 8, 20);
+  this.scene.add(fillFront);
+  
+  // мягкий боковой свет
+  const fillSide = new THREE.PointLight(0xffaa88, 0.25, 60);
+  fillSide.position.set(-15, 6, -10);
+  this.scene.add(fillSide);
+}
 
   private setupSky(): void {
-    this.sky = new Sky();
-    this.sky.scale.setScalar(450);
-    this.scene.add(this.sky);
+  this.sky = new Sky();
+  this.sky.scale.setScalar(450);
+  this.scene.add(this.sky);
 
-    const uniforms = this.sky.material.uniforms;
-    uniforms['turbidity'].value = 6;      // ясность атмосферы
-    uniforms['rayleigh'].value = 1.5;     // интенсивность рассеяния
-    uniforms['mieCoefficient'].value = 0.005;
-    uniforms['mieDirectionalG'].value = 0.7;
-    uniforms['sunPosition'].value.set(0.5, 0.2, 0.5); // положение солнца
+  const uniforms = this.sky.material.uniforms;
+  uniforms['turbidity'].value = 6;
+  uniforms['rayleigh'].value = 1.8;
+  uniforms['mieCoefficient'].value = 0.005;
+  uniforms['mieDirectionalG'].value = 0.7;
+  
+  // Позиция солнца в сферических координатах (сзади и сверху)
+  // Y = 0.2 (немного над горизонтом), Z отрицательное для света сзади
+  uniforms['sunPosition'].value.set(-0.1, 0.25, -0.85).normalize();
 
-    // Синхронизируем направленный свет с положением солнца (опционально)
-    this.sunLight.position.copy(uniforms['sunPosition'].value.clone().multiplyScalar(100));
-    this.sunLight.position.y = Math.max(10, this.sunLight.position.y);
-  }
+  // Синхронизируем направленный свет
+  this.sunLight.position.copy(uniforms['sunPosition'].value.clone().multiplyScalar(100));
+  this.sunLight.position.y = Math.max(15, this.sunLight.position.y);
+}
 
   private setupGroundAndRocks(): void {
     // Базовая плоскость земли (под травой, чтобы не было просветов)

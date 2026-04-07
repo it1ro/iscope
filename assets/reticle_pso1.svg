@@ -3,35 +3,35 @@
   <defs>
     <style>
       .main-line {
-        stroke: rgba(255, 200, 120, 0.85);
+        stroke: rgba(0, 0, 0, 0.85);
         stroke-width: 1;
         fill: none;
       }
       .thin-line {
-        stroke: rgba(255, 200, 120, 0.5);
+        stroke: rgba(0, 0, 0, 0.5);
         stroke-width: 0.8;
         fill: none;
       }
       .faint-line {
-        stroke: rgba(255, 200, 120, 0.08);
+        stroke: rgba(0, 0, 0, 0.08);
         stroke-width: 0.6;
         fill: none;
       }
       .chevron {
-        stroke: rgba(255, 200, 120, 0.75);
+        stroke: rgba(0, 0, 0, 0.75);
         stroke-width: 0.5;
         fill: none;
         stroke-linecap: round;
         stroke-linejoin: round;
       }
       .label {
-        fill: rgba(255, 200, 120, 0.6);
+        fill: rgba(0, 0, 0, 0.6);
         font-family: 'Courier New', monospace;
         font-size: 9px;
         font-weight: normal;
       }
       .label-small {
-        fill: rgba(255, 200, 120, 0.5);
+        fill: rgba(0, 0, 0, 0.5);
         font-family: 'Courier New', monospace;
         font-size: 7px;
       }
@@ -42,21 +42,13 @@
   <line x1="500" y1="0" x2="500" y2="1000" class="faint-line"/>
   <line x1="0" y1="500" x2="1000" y2="500" class="faint-line"/>
 
-  <!-- ===== 4 ШЕВРОНА ПСО-1 (все одинакового размера, расположены под центральной точкой) ===== -->
-
-  <!-- 1. Центральный шеврон (под центральной точкой) -->
+  <!-- ===== 4 ШЕВРОНА ПСО-1 ===== -->
   <path d="M488 532 L500 520 L512 532" class="chevron"/>
-
-  <!-- 2. Второй шеврон (ниже, одинакового размера) -->
   <path d="M488 572 L500 560 L512 572" class="chevron"/>
-
-  <!-- 3. Третий шеврон (ниже, одинакового размера) -->
   <path d="M488 612 L500 600 L512 612" class="chevron"/>
-
-  <!-- 4. Четвертый шеврон (ниже, одинакового размера) -->
   <path d="M488 652 L500 640 L512 652" class="chevron"/>
 
-  <!-- Дальномерная шкала (левая) - для цели 1.7м -->
+  <!-- Дальномерная шкала (левая) -->
   <g id="rangefinder" transform="translate(130, 500)">
     <line x1="0" y1="-180" x2="25" y2="-180" class="main-line"/>
     <text x="32" y="-177" class="label">2</text>
@@ -76,10 +68,8 @@
     <line x1="0" y1="-200" x2="0" y2="150" class="thin-line"/>
   </g>
 
-  <!-- Шкала боковых поправок (нижняя) - теперь проходит через центральную точку, без горизонтальной линии -->
+  <!-- Шкала боковых поправок (нижняя) -->
   <g id="windage" transform="translate(500, 500)">
-    <!-- Убрана горизонтальная линия; оставлены только вертикальные метки и подписи -->
-
     <line x1="-100" y1="0" x2="-100" y2="4" class="thin-line"/>
     <text x="-100" y="13" class="label-small" text-anchor="middle">10</text>
 
@@ -114,5 +104,5 @@
   </g>
 
   <!-- Центральная точка -->
-  <circle cx="500" cy="500" r="0.5" fill="rgba(255, 200, 120, 0.4)"/>
+  <circle cx="500" cy="500" r="0.5" fill="rgba(0, 0, 0, 0.4)"/>
 </svg>
