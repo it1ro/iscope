@@ -1,3 +1,4 @@
+// src/game/UIManager.ts
 import { GameEvent } from '../types';
 import { EventBus } from './EventBus';
 
@@ -8,7 +9,6 @@ export class UIManager {
   private score = 0;
 
   constructor(eventBus: EventBus) {
-    // Создаём элемент дальномера
     this.rangefinderEl = document.createElement('div');
     this.rangefinderEl.className = 'rangefinder';
     this.rangefinderEl.innerHTML = '🎯 --- м';
@@ -27,7 +27,6 @@ export class UIManager {
     });
   }
 
-  // Вызывается из Game для обновления дальномера
   public updateRangefinder(distance: number | null): void {
     if (distance !== null) {
       this.rangefinderEl.innerHTML = `🎯 ${distance.toFixed(0)} м`;

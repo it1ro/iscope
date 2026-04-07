@@ -1,16 +1,22 @@
 import * as THREE from 'three';
 import { GameEvent } from '../types';
 import { EventBus } from './EventBus';
+import { DecalManager } from './DecalManager';
 
 export class Effects {
   private scene: THREE.Scene;
   private particlePool: THREE.Points[] = [];
+  private decalManager: DecalManager;
+  private eventBus: EventBus;
 
   constructor(scene: THREE.Scene, eventBus: EventBus) {
     this.scene = scene;
-    eventBus.on('bullet_hit', (e: Extract<GameEvent, { type: 'bullet_hit' }>) => {
+    this.eventBus = eventBus;
+    this.decalManager = new DecalManager(scene, '/assets/bullet_hole.png');
+    this.eventBus.on('bullet_hit', (e: Extract<GameEvent, { type: 'bullet_hit' }>) => {
       this.spawnHitMarker();
       this.spawnImpactParticles(e.hitPoint);
+      this.createPermanentMark(e);
     });
   }
 
@@ -70,5 +76,39 @@ export class Effects {
       requestAnimationFrame(animate);
     };
     animate();
+  }
+
+  /**
+   * Создаёт постоянный след (декаль) на цели и сохраняет ссылку в target.hits
+   */
+  private createPermanentMark(e: Extract<GameEvent, { type: 'bullet_hit' }>): void {
+    const { target, hitPoint, hitNormal, hitObject } = e;
+    // hitObject может быть undefined; если есть — используем его как mesh
+    let mesh: THREE.Mesh | undefined;
+    if (hitObject && (hitObject as THREE.Mesh).isMesh) {
+      mesh = hitObject as THREE.Mesh;
+    } else {
+      // fallback: попробуем найти первый Mesh внутри target.mesh
+      target.mesh.traverse((obj) => {
+        if (!mesh && (obj as THREE.Mesh).isMesh) mesh = obj as THREE.Mesh;
+      });
+    }
+    if (!mesh) return;
+
+    // Создаём декаль и сохраняем ссылку
+    const decal = this.decalManager.createDecal(mesh, hitPoint, hitNormal, 0.12);
+    target.hits = target.hits || [];
+    target.hits.push({ point: hitPoint.clone(), normal: hitNormal.clone(), decalMesh: decal });
+  }
+
+  dispose(): void {
+    this.decalManager.dispose();
+    // очистка пула частиц если нужно
+    this.particlePool.forEach(p => {
+      if (p.geometry) p.geometry.dispose();
+      if (p.material) (p.material as THREE.Material).dispose();
+      if (p.parent) p.parent.remove(p);
+    });
+    this.particlePool = [];
   }
 }

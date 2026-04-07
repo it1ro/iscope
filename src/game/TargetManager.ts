@@ -12,6 +12,7 @@ export class TargetManager {
   constructor(scene: THREE.Scene, eventBus: EventBus) {
     this.scene = scene;
     this.init();
+
     eventBus.on('bullet_hit', (e: Extract<GameEvent, { type: 'bullet_hit' }>) => {
       this.destroyTarget(e.target);
       this.spawnNewTarget();
@@ -22,10 +23,15 @@ export class TargetManager {
   private init(): void {
     this.targets.forEach(t => this.disposeGroup(t.mesh));
     this.targets = [];
-    for (let i = 0; i < this.MAX_TARGETS; i++) {
+
+    // создаём несколько целей + одну ростовую на 100м
+    // сначала обычные
+    for (let i = 0; i < this.MAX_TARGETS - 1; i++) {
       const { x, z } = this.randomPos();
       this.targets.push(this.createTarget(x, z));
     }
+    // затем ростовая мишень на 100 м по центру (x=0)
+    this.targets.push(this.createHumanTargetAt(100, 0));
   }
 
   private createTarget(x: number, z: number): Target {
@@ -46,7 +52,50 @@ export class TargetManager {
       id: `tgt_${x}_${z}`,
       mesh: group,
       position: new THREE.Vector3(x, this.HEIGHT, z),
-      radius: this.RADIUS
+      radius: this.RADIUS,
+      hits: []
+    };
+  }
+
+  /**
+   * Создать ростовую мишень (силуэт человека) на заданной дистанции (в метрах).
+   * width и height в метрах (по умолчанию 0.5 x 1.7)
+   */
+  private createHumanTargetAt(rangeMeters: number, x = 0, width = 0.5, height = 1.7): Target {
+    const group = new THREE.Group();
+
+    // Загрузка текстуры силуэта (ожидается assets/target_human.png)
+    const loader = new THREE.TextureLoader();
+    const tex = loader.load('/assets/target_human.png');
+
+    // Материал с прозрачностью (чтобы силуэт был виден)
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      transparent: true,
+      depthWrite: true
+    });
+
+    // Плоскость: ширина x высота (метры)
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat);
+    // Плоскость ориентирована лицом к камере (по -Z), центр по высоте
+    plane.position.set(0, height / 2, 0);
+    plane.castShadow = true;
+    plane.receiveShadow = false;
+    group.add(plane);
+
+    // Позиционируем группу в мире: x, ground y=0, z=rangeMeters
+    group.position.set(x, 0, rangeMeters);
+    // Повернуть так, чтобы лицевая сторона смотрела на камеру (если камера в 0,0,0 и смотрит +Z)
+    group.lookAt(new THREE.Vector3(0, plane.position.y, 0));
+
+    this.scene.add(group);
+
+    return {
+      id: `human_${rangeMeters}_${x}`,
+      mesh: group,
+      position: new THREE.Vector3(x, height / 2, rangeMeters),
+      radius: Math.max(width, height) / 2,
+      hits: []
     };
   }
 
@@ -74,10 +123,11 @@ export class TargetManager {
   private resetAllTargets(): void {
     this.targets.forEach(t => this.disposeGroup(t.mesh));
     this.targets = [];
-    for (let i = 0; i < this.MAX_TARGETS; i++) {
+    for (let i = 0; i < this.MAX_TARGETS - 1; i++) {
       const { x, z } = this.randomPos();
       this.targets.push(this.createTarget(x, z));
     }
+    this.targets.push(this.createHumanTargetAt(100, 0));
   }
 
   public getTargets(): Target[] {
@@ -85,10 +135,37 @@ export class TargetManager {
   }
 
   private disposeGroup(group: THREE.Group): void {
+    // Найдём соответствующий Target, чтобы удалить декали, если они есть
+    const target = this.targets.find(t => t.mesh === group);
+    if (target?.hits) {
+      for (const h of target.hits) {
+        if (h.decalMesh) {
+          try {
+            if (h.decalMesh.geometry) h.decalMesh.geometry.dispose();
+            if (h.decalMesh.material) {
+              const mat = h.decalMesh.material as any;
+              if (Array.isArray(mat)) mat.forEach((m: THREE.Material) => m.dispose());
+              else mat.dispose();
+            }
+            if (h.decalMesh.parent) h.decalMesh.parent.remove(h.decalMesh);
+          } catch (err) {
+            // ignore disposal errors
+          }
+        }
+      }
+    }
+
     group.traverse(child => {
       if (child instanceof THREE.Mesh) {
-        child.geometry.dispose();
-        if (child.material) (child.material as THREE.Material).dispose();
+        try {
+          child.geometry.dispose();
+        } catch {}
+        if (child.material) {
+          try {
+            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+            else (child.material as THREE.Material).dispose();
+          } catch {}
+        }
       }
     });
     this.scene.remove(group);

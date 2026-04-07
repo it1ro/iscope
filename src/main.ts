@@ -1,3 +1,4 @@
+// src/main.ts
 import { SceneManager } from './game/SceneManager';
 import { InputController } from './game/InputController';
 import { Ballistics } from './game/Ballistics';
@@ -5,6 +6,7 @@ import { TargetManager } from './game/TargetManager';
 import { Effects } from './game/Effects';
 import { UIManager } from './game/UIManager';
 import { EventBus } from './game/EventBus';
+import { Reticle } from './game/Reticle';
 import * as THREE from 'three';
 
 class Game {
@@ -18,6 +20,7 @@ class Game {
   private lastTime = performance.now();
   private rafId: number | null = null;
   private raycaster = new THREE.Raycaster();
+  private reticle: Reticle | null = null;
 
   constructor() {
     const canvas = document.createElement('canvas');
@@ -32,6 +35,9 @@ class Game {
     this.effects = new Effects(this.sceneMgr.scene, this.eventBus);
     this.ui = new UIManager(this.eventBus);
 
+    // create reticle overlay (reads camera and ballistics)
+    this.reticle = new Reticle(this.sceneMgr.camera, this.ballistics);
+
     this.loop();
   }
 
@@ -43,6 +49,9 @@ class Game {
 
     this.input.update(now / 1000);
     this.ballistics.update(dt, this.targetMgr.getTargets());
+
+    // update reticle marks each frame (cheap: small number of ranges)
+    this.reticle?.updateMarks();
 
     // Дальномер: луч из центра камеры
     const center = new THREE.Vector2(0, 0);
@@ -66,6 +75,7 @@ class Game {
     this.targetMgr.dispose();
     this.sceneMgr.dispose();
     this.eventBus.dispose();
+    this.reticle?.dispose();
   }
 }
 

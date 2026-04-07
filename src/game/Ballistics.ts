@@ -1,4 +1,3 @@
-// src/game/Ballistics.ts
 import * as THREE from 'three';
 import { BulletState, Target, GameEvent } from '../types';
 import { EventBus } from './EventBus';
@@ -22,7 +21,6 @@ export class Ballistics {
   private readonly airDensity = 1.225; // kg/m^3 (sea level, 15°C)
   private readonly gravity = 9.81; // m/s^2
   private readonly wind = new THREE.Vector3(0.3, 0, 0.1); // m/s (wind velocity vector)
-  // fallback Cd if BC-based estimation not used
   private readonly fallbackCd = 0.295;
 
   // Trail
@@ -33,17 +31,14 @@ export class Ballistics {
   private trailAttr: THREE.BufferAttribute;
   private trailMesh: THREE.Points;
 
-  // Reusable temporaries to avoid allocations
+  // Reusable temporaries
   private tmpDir = new THREE.Vector3();
   private tmpDistVec = new THREE.Vector3();
   private tmpRelVel = new THREE.Vector3();
   private tmpDrag = new THREE.Vector3();
   private tmpGrav = new THREE.Vector3(0, -this.gravity, 0);
 
-  // Event handler reference for unsubscribe
   private shootHandler: (e: GameEvent) => void;
-
-  // Cache for target collision meshes to avoid repeated traversal
   private targetMeshCache = new WeakMap<Target, THREE.Object3D[]>();
 
   constructor(scene: THREE.Scene, eventBus: EventBus) {
@@ -148,7 +143,6 @@ export class Ballistics {
         this.tmpDrag.copy(this.tmpRelVel).multiplyScalar(-dragAccMag / relSpeed);
 
         // Integrate accelerations: gravity + drag
-        // semi-implicit Euler: v += a * dt; pos += v * dt
         velocity.addScaledVector(this.tmpDrag, step);
       }
 
@@ -198,6 +192,15 @@ export class Ballistics {
       const hits = this.raycaster.intersectObjects(targetMeshes, true);
       if (hits.length > 0) {
         const hit = hits[0];
+        // Compute world-space normal if available
+        let hitNormal = new THREE.Vector3();
+        if (hit.face) {
+          const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+          hitNormal.copy(hit.face.normal).applyMatrix3(normalMatrix).normalize();
+        } else {
+          hitNormal.copy(this.tmpDir).negate();
+        }
+
         // Walk up hierarchy to find matching Target
         let obj: THREE.Object3D | null = hit.object;
         let foundTarget: Target | undefined;
@@ -208,7 +211,6 @@ export class Ballistics {
         }
 
         if (!foundTarget) {
-          // try parent chain if not found yet
           obj = hit.object.parent;
           while (obj) {
             foundTarget = targets.find(t => t.mesh === obj);
@@ -218,11 +220,14 @@ export class Ballistics {
         }
 
         if (foundTarget) {
+          // Emit extended event with hitNormal and hitObject
           this.eventBus.emit({
             type: 'bullet_hit',
             target: foundTarget,
             distance: mesh.position.distanceTo(foundTarget.position),
-            hitPoint: hit.point
+            hitPoint: hit.point.clone(),
+            hitNormal: hitNormal.clone(),
+            hitObject: hit.object
           } as any);
         } else {
           console.warn('Попадание в объект, но цель не найдена');
@@ -283,9 +288,7 @@ export class Ballistics {
 
     // Dispose geometry if possible
     const geo = this.bullet.mesh.geometry as THREE.BufferGeometry | undefined;
-    if (geo && typeof geo.dispose === 'function') {
-      geo.dispose();
-    }
+    if (geo && typeof geo.dispose === 'function') geo.dispose();
 
     // Dispose material(s) safely
     const mat = (this.bullet.mesh.material as any);
@@ -335,18 +338,9 @@ export class Ballistics {
     return Math.PI * r * r;
   }
 
-  /**
-   * Простая аппроксимация Cd по BC/скорости.
-   * Для точности лучше заменить на таблицу G1/G7 drag-коэффициентов.
-   * Возвращает null если не удалось оценить — тогда используется fallbackCd.
-   */
   private estimateCdFromBC(speed: number): number | null {
-    // Упрощённая эвристика: более высокие BC -> меньший Cd.
-    // Это грубая аппроксимация, но даёт реалистичную динамику.
-    // BC типично 0.2..0.5 -> Cd ~ 0.35..0.25
     const bc = this.BC;
     if (!bc || bc <= 0) return null;
-    // map BC [0.2, 0.5] -> Cd [0.36, 0.24]
     const minBC = 0.2;
     const maxBC = 0.5;
     const minCd = 0.24;
@@ -354,5 +348,40 @@ export class Ballistics {
     const t = Math.min(1, Math.max(0, (bc - minBC) / (maxBC - minBC)));
     const cd = maxCd + (minCd - maxCd) * t;
     return cd;
+  }
+
+  /**
+   * Симуляция полёта пули без создания мешей.
+   * Возвращает вертикальное смещение (drop) в метрах относительно прямой линии выстрела
+   * на дистанции rangeMeters. Положительное значение — падение вниз (обычно отрицательное y).
+   */
+  public getDropAtRange(rangeMeters: number): number {
+    // simulate from origin along +Z, initial velocity along +Z
+    const dtStep = 1 / 240;
+    const area = this.getCrossSectionArea();
+    const pos = new THREE.Vector3(0, 0, 0);
+    const vel = new THREE.Vector3(0, 0, this.muzzleVelocity);
+    let traveled = 0;
+    const maxSimTime = 20; // safety
+    let t = 0;
+    while (traveled < rangeMeters && t < maxSimTime) {
+      // substep integration
+      this.tmpRelVel.copy(vel).sub(this.wind);
+      const relSpeed = this.tmpRelVel.length();
+      if (relSpeed > 1e-6) {
+        const Cd = this.estimateCdFromBC(relSpeed) ?? this.fallbackCd;
+        const dragAccMag = (this.airDensity * Cd * area * relSpeed * relSpeed) / (2 * this.bulletMass);
+        this.tmpDrag.copy(this.tmpRelVel).multiplyScalar(-dragAccMag / relSpeed);
+        vel.addScaledVector(this.tmpDrag, dtStep);
+      }
+      vel.addScaledVector(this.tmpGrav, dtStep);
+      pos.addScaledVector(vel, dtStep);
+      traveled = pos.z;
+      t += dtStep;
+      // safety break if bullet goes underground
+      if (pos.y < -100) break;
+    }
+    // drop relative to straight line (initial y=0)
+    return -pos.y;
   }
 }

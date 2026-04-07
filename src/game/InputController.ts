@@ -1,3 +1,5 @@
+// src/game/InputController.ts (исправленная версия, без зума)
+
 import * as THREE from 'three';
 import { EventBus } from './EventBus';
 
@@ -10,14 +12,22 @@ export class InputController {
   private pitch = 0.15;
   private sensitivity = 0.0022;
   private recoilImpulse = 0;
-  private zoomLevel = 1;
   private breathAmp = 0.004;
   private breathFreq = 1.8;
+
+  // scope settings
+  private isScoped = false;
+  private hipFov = 75;
+  private scopeMagnification = 4; // PSO-1 ~4x
+  private scopeFov = this.hipFov / this.scopeMagnification;
+  private fovLerpSpeed = 0.18;
 
   constructor(canvas: HTMLCanvasElement, camera: THREE.PerspectiveCamera, eventBus: EventBus) {
     this.canvas = canvas;
     this.camera = camera;
     this.eventBus = eventBus;
+    this.hipFov = camera.fov;
+    this.scopeFov = this.hipFov / this.scopeMagnification;
     this.setupListeners();
   }
 
@@ -43,27 +53,41 @@ export class InputController {
         this.getDirection(dir);
         this.eventBus.emit({ type: 'shoot', startPos: pos, direction: dir });
       }
+      if (e.button === 2 && this.mouseLocked) {
+        e.preventDefault();
+        this.toggleScope();
+      }
     });
 
-    document.addEventListener('wheel', (e) => {
-      if (!this.mouseLocked) return;
-      this.zoomLevel = THREE.MathUtils.clamp(this.zoomLevel - e.deltaY * 0.001, 1, 3);
-      this.camera.fov = THREE.MathUtils.lerp(75, 15, (this.zoomLevel - 1) / 2);
-      this.camera.updateProjectionMatrix();
+    document.addEventListener('contextmenu', (e) => {
+      if (this.mouseLocked) e.preventDefault();
     });
 
-    // Сброс игры по клавише R
+    // ⚠️ БЛОК WHEEL УДАЛЁН — ЗУМА БОЛЬШЕ НЕТ
+
     document.addEventListener('keydown', (e) => {
       if (e.code === 'KeyR' && this.mouseLocked) {
         this.eventBus.emit({ type: 'reset_game' });
       }
+      if (e.code === 'KeyV' && this.mouseLocked) {
+        this.toggleScope();
+      }
     });
+  }
+
+  private toggleScope(): void {
+    this.isScoped = !this.isScoped;
   }
 
   public update(time: number): void {
     if (!this.mouseLocked) return;
     const sway = Math.sin(time * this.breathFreq) * this.breathAmp;
     this.recoilImpulse = THREE.MathUtils.lerp(this.recoilImpulse, 0, 0.15);
+
+    const targetFov = this.isScoped ? this.scopeFov : this.hipFov;
+    this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFov, this.fovLerpSpeed);
+    this.camera.updateProjectionMatrix();
+
     this.camera.rotation.set(this.pitch + sway + this.recoilImpulse, this.yaw, 0);
   }
 
@@ -73,5 +97,9 @@ export class InputController {
 
   public getPosition(): THREE.Vector3 {
     return this.camera.position.clone();
+  }
+
+  public isInScope(): boolean {
+    return this.isScoped;
   }
 }
