@@ -1,0 +1,50 @@
+node_modules/
+.pnpm-store/
+yarn-error.log*
+package-lock.json   # если хотите игнорировать lock-файл, но обычно его коммитят; решайте сами
+# Для lock-файлов лучше не игнорировать, но если нужно — раскомментируйте
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Директории сборки
+dist/
+dist-ssr/
+build/
+.out/
+
+# Файлы IDE и редакторов
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# Файлы окружения
+.env
+.env.local
+.env.*.local
+
+# Кэш Vite
+.vite/
+node_modules/.vite
+
+# Отчёты покрытия кода
+coverage/
+.nyc_output/
+
+# Системные файлы
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# TypeScript кэш
+*.tsbuildinfo

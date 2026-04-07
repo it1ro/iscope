@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Снайперский шутер — баллистика и видимая пуля</title>
+    <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+    <div class="scope">
+        <div class="scope-dot"></div>
+    </div>
+    <div class="ui">
+        🎯 ПОПАДАНИЯ: <span id="score">0</span>
+    </div>
+    <div class="distance-panel">
+        📏 ДИСТАНЦИЯ ДО ЦЕЛИ: <span id="distanceValue" class="value">---</span> м
+    </div>
+    <div class="controls-hint">
+        🖱️ МЫШЬ — прицеливание | 🔫 ЛКМ — выстрел (пуля летит с баллистикой)
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
