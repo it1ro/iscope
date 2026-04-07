@@ -8,7 +8,7 @@ export class InputController {
   private camera: THREE.PerspectiveCamera;
   private eventBus: EventBus;
   private mouseLocked = false;
-  private yaw = 0;
+  private yaw = Math.PI;
   private pitch = 0.15;
   private sensitivity = 0.0022;
   private recoilImpulse = 0;

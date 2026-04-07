@@ -17,11 +17,14 @@ class Game {
   private targetMgr: TargetManager;
   private effects: Effects;
   private ui: UIManager;
+  private audioMgr: AudioManager;
   private eventBus = new EventBus();
   private lastTime = performance.now();
   private rafId: number | null = null;
   private raycaster = new THREE.Raycaster();
   private reticle: Reticle | null = null;
+
+  private onPointerLockChange: () => void;
 
   constructor() {
     const canvas = document.createElement('canvas');
@@ -37,8 +40,15 @@ class Game {
     this.effects = new Effects(this.sceneMgr.scene, this.eventBus);
     this.ui = new UIManager(this.eventBus);
 
-    // create reticle overlay (reads camera and ballistics)
     this.reticle = new Reticle(this.sceneMgr.camera, this.ballistics);
+
+    // Запускаем фоновый звук при захвате курсора
+    this.onPointerLockChange = () => {
+      if (document.pointerLockElement === canvas) {
+        this.audioMgr.startBackground();
+      }
+    };
+    document.addEventListener('pointerlockchange', this.onPointerLockChange);
 
     this.loop();
   }
@@ -52,10 +62,8 @@ class Game {
     this.input.update(now / 1000);
     this.ballistics.update(dt, this.targetMgr.getTargets());
 
-    // update reticle marks each frame (cheap: small number of ranges)
     this.reticle?.updateMarks();
 
-    // Дальномер: луч из центра камеры
     const center = new THREE.Vector2(0, 0);
     this.raycaster.setFromCamera(center, this.sceneMgr.camera);
     const intersects = this.raycaster.intersectObjects(
@@ -73,6 +81,7 @@ class Game {
 
   dispose(): void {
     if (this.rafId) cancelAnimationFrame(this.rafId);
+    document.removeEventListener('pointerlockchange', this.onPointerLockChange);
     this.ballistics.dispose();
     this.targetMgr.dispose();
     this.sceneMgr.dispose();

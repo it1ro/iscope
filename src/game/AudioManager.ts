@@ -1,4 +1,5 @@
 // src/game/AudioManager.ts
+
 import * as Tone from 'tone';
 import { EventBus } from './EventBus';
 import { GameEvent } from '../types';
@@ -22,23 +23,27 @@ export class AudioManager {
     '/assets/sfx/svd-main.mp3'
   ];
 
+  // Фоновый звук природы
+  private backgroundAudio: HTMLAudioElement;
+  private backgroundVolume = 1;
+
   constructor(eventBus: EventBus) {
     this.eventBus = eventBus;
     
     // Создаём эффекты
-    this.hpFilter = new Tone.Filter(40, 'highpass');   // обрезаем инфранизкие частоты
+    this.hpFilter = new Tone.Filter(40, 'highpass');
     
-    this.volume = new Tone.Volume(-6);                  // общее снижение громкости
+    this.volume = new Tone.Volume(-6);
     
     this.distortion = new Tone.Distortion({
       distortion: 0.1,
-      wet: 0.15                                        // лёгкое насыщение
+      wet: 0.15
     });
     
     this.eq = new Tone.EQ3({
-      low: 4,                                          // усиление баса
-      mid: 2,                                          // небольшая середина
-      high: -1                                         // смягчение верхов
+      low: 4,
+      mid: 2,
+      high: -1
     });
     
     this.compressor = new Tone.Compressor({
@@ -56,7 +61,7 @@ export class AudioManager {
     
     this.output = new Tone.Gain(0.9);
     
-    // Строим цепочку: Player -> HP Filter -> Volume -> Distortion -> EQ -> Compressor -> Reverb -> Output -> Destination
+    // Строим цепочку
     this.hpFilter.connect(this.volume);
     this.volume.connect(this.distortion);
     this.distortion.connect(this.eq);
@@ -74,6 +79,19 @@ export class AudioManager {
     });
     
     this.eventBus.on('shoot', this.handleShoot.bind(this));
+
+    // Настройка фонового звука природы (MP3)
+    this.backgroundAudio = new Audio('/assets/sfx/nature.mp3');
+    this.backgroundAudio.loop = true;
+    this.backgroundAudio.volume = this.backgroundVolume;
+
+    // Отладка загрузки фона
+    this.backgroundAudio.addEventListener('canplaythrough', () => {
+      console.log('✅ Фоновый звук (MP3) загружен и готов');
+    });
+    this.backgroundAudio.addEventListener('error', (e) => {
+      console.error('❌ Ошибка загрузки фонового звука:', e);
+    });
   }
 
   private async loadSounds(): Promise<void> {
@@ -85,7 +103,6 @@ export class AudioManager {
         fadeOut: 0.1
       });
       
-      // Подключаем плеер к началу цепочки (hpFilter)
       player.connect(this.hpFilter);
       
       await player.load(url);
@@ -101,7 +118,6 @@ export class AudioManager {
       return;
     }
     
-    // Убедимся, что аудиоконтекст запущен
     if (Tone.context.state !== 'running') {
       Tone.start().then(() => this.playRandomSound());
     } else {
@@ -113,19 +129,30 @@ export class AudioManager {
     const randomIndex = Math.floor(Math.random() * this.players.length);
     const player = this.players[randomIndex];
     
-    // Вариация питча и громкости для естественности
-    const pitchVariation = 0.95 + Math.random() * 0.1; // 0.95 .. 1.05
-    const volumeVariation = 0.9 + Math.random() * 0.2;  // 0.9 .. 1.1
+    const pitchVariation = 0.95 + Math.random() * 0.1;
+    const volumeVariation = 0.9 + Math.random() * 0.2;
     
     player.playbackRate = pitchVariation;
     player.volume.value = volumeVariation;
     
-    // Автоматизация реверберации: быстрый рост wet, затем медленный спад
     this.reverb.wet.rampTo(0.35, 0.05);
     this.reverb.wet.rampTo(0.2, 0.8);
     
-    // Запускаем воспроизведение
     player.start();
+  }
+
+  /**
+   * Запускает фоновый звук природы (вызывается после жеста пользователя)
+   */
+  public startBackground(): void {
+    console.log('🎵 startBackground вызван, paused =', this.backgroundAudio.paused);
+    if (this.backgroundAudio.paused) {
+      this.backgroundAudio.play()
+        .then(() => console.log('▶️ Фоновый звук играет'))
+        .catch(err => console.warn('⚠️ Не удалось запустить фон:', err));
+    } else {
+      console.log('🔄 Фоновый звук уже играет');
+    }
   }
 
   public dispose(): void {
@@ -147,6 +174,13 @@ export class AudioManager {
     
     if (typeof (this.eventBus as any).off === 'function') {
       (this.eventBus as any).off('shoot', this.handleShoot);
+    }
+
+    // Останавливаем и очищаем фоновый звук
+    if (this.backgroundAudio) {
+      this.backgroundAudio.pause();
+      this.backgroundAudio.src = '';
+      this.backgroundAudio = null!;
     }
   }
 }
