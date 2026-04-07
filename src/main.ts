@@ -7,6 +7,7 @@ import { Effects } from './game/Effects';
 import { UIManager } from './game/UIManager';
 import { EventBus } from './game/EventBus';
 import { Reticle } from './game/Reticle';
+import { AudioManager } from './game/AudioManager';
 import * as THREE from 'three';
 
 class Game {
@@ -29,6 +30,7 @@ class Game {
     document.body.appendChild(canvas);
 
     this.sceneMgr = new SceneManager(canvas);
+    this.audioMgr = new AudioManager(this.eventBus);
     this.input = new InputController(canvas, this.sceneMgr.camera, this.eventBus);
     this.targetMgr = new TargetManager(this.sceneMgr.scene, this.eventBus);
     this.ballistics = new Ballistics(this.sceneMgr.scene, this.eventBus);
@@ -76,6 +78,7 @@ class Game {
     this.sceneMgr.dispose();
     this.eventBus.dispose();
     this.reticle?.dispose();
+    this.audioMgr.dispose();
   }
 }
 
