@@ -1,4 +1,4 @@
-// src/game/InputController.ts (исправленная версия, без зума)
+// src/game/InputController.ts (полный файл)
 
 import * as THREE from 'three';
 import { EventBus } from './EventBus';
@@ -12,8 +12,14 @@ export class InputController {
   private pitch = 0.15;
   private sensitivity = 0.0022;
   private recoilImpulse = 0;
+  
+  // Параметры дыхания (пока отключены флагом)
   private breathAmp = 0.004;
   private breathFreq = 1.8;
+
+  // 🔧 ФЛАГ ВРЕМЕННОГО ОТКЛЮЧЕНИЯ ДЫХАНИЯ
+  // Установите true, когда потребуется включить колебания прицела для усложнённых режимов
+  private enableBreathing = false;
 
   // scope settings
   private isScoped = false;
@@ -63,8 +69,6 @@ export class InputController {
       if (this.mouseLocked) e.preventDefault();
     });
 
-    // ⚠️ БЛОК WHEEL УДАЛЁН — ЗУМА БОЛЬШЕ НЕТ
-
     document.addEventListener('keydown', (e) => {
       if (e.code === 'KeyR' && this.mouseLocked) {
         this.eventBus.emit({ type: 'reset_game' });
@@ -81,7 +85,12 @@ export class InputController {
 
   public update(time: number): void {
     if (!this.mouseLocked) return;
-    const sway = Math.sin(time * this.breathFreq) * this.breathAmp;
+
+    // Дыхание: отключаем, пока флаг выключен. Оставим для будущих режимов.
+    const sway = this.enableBreathing
+      ? Math.sin(time * this.breathFreq) * this.breathAmp
+      : 0;
+
     this.recoilImpulse = THREE.MathUtils.lerp(this.recoilImpulse, 0, 0.15);
 
     const targetFov = this.isScoped ? this.scopeFov : this.hipFov;
