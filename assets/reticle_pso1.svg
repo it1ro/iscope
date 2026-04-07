@@ -42,11 +42,7 @@
   <line x1="500" y1="0" x2="500" y2="1000" class="faint-line"/>
   <line x1="0" y1="500" x2="1000" y2="500" class="faint-line"/>
 
-  <!-- ===== 4 ШЕВРОНА ПСО-1 ===== -->
-  <path d="M488 532 L500 520 L512 532" class="chevron"/>
-  <path d="M488 572 L500 560 L512 572" class="chevron"/>
-  <path d="M488 612 L500 600 L512 612" class="chevron"/>
-  <path d="M488 652 L500 640 L512 652" class="chevron"/>
+  <!-- Статические шевроны удалены — они будут генерироваться динамически в Reticle -->
 
   <!-- Дальномерная шкала (левая) -->
   <g id="rangefinder" transform="translate(130, 500)">
@@ -102,7 +98,4 @@
     <line x1="100" y1="0" x2="100" y2="4" class="thin-line"/>
     <text x="100" y="13" class="label-small" text-anchor="middle">10</text>
   </g>
-
-  <!-- Центральная точка -->
-  <!-- <circle cx="500" cy="500" r="0.5" fill="rgba(0, 0, 0, 0.4)"/> -->
 </svg>
