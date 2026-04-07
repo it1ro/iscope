@@ -27,3 +27,24 @@ body::after { content: ''; position: fixed; top: 0; left: 0; width: 100%; height
 
 .hit-marker { position: absolute; top: 50%; left: 50%; width: 60px; height: 60px; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(255,100,100,0.6) 0%, rgba(255,0,0,0) 80%); pointer-events: none; z-index: 15; animation: hitFlash 0.2s ease-out forwards; }
 @keyframes hitFlash { 0% { opacity: 1; transform: translate(-50%, -50%) scale(0.5); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.8); } }
+
+/* Добавить в конец файла */
+.rangefinder {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-family: monospace;
+  font-size: 18px;
+  font-weight: bold;
+  color: #ffaa44;
+  pointer-events: none;
+  z-index: 20;
+  white-space: nowrap;
+  border: 1px solid #ffaa44;
+  box-shadow: 0 0 8px rgba(0,0,0,0.5);
+}

@@ -18,5 +18,6 @@ export interface BulletState {
 
 export type GameEvent =
   | { type: 'shoot'; startPos: THREE.Vector3; direction: THREE.Vector3 }
-  | { type: 'bullet_hit'; target: Target; distance: number }
-  | { type: 'bullet_miss' };
+  | { type: 'bullet_hit'; target: Target; distance: number; hitPoint: THREE.Vector3 }
+  | { type: 'bullet_miss' }
+  | { type: 'reset_game' };

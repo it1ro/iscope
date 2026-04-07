@@ -5,6 +5,7 @@ import { TargetManager } from './game/TargetManager';
 import { Effects } from './game/Effects';
 import { UIManager } from './game/UIManager';
 import { EventBus } from './game/EventBus';
+import * as THREE from 'three';
 
 class Game {
   private sceneMgr: SceneManager;
@@ -16,10 +17,12 @@ class Game {
   private eventBus = new EventBus();
   private lastTime = performance.now();
   private rafId: number | null = null;
+  private raycaster = new THREE.Raycaster();
 
   constructor() {
     const canvas = document.createElement('canvas');
-    canvas.style.width = '100%'; canvas.style.height = '100%';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
     document.body.appendChild(canvas);
 
     this.sceneMgr = new SceneManager(canvas);
@@ -40,6 +43,20 @@ class Game {
 
     this.input.update(now / 1000);
     this.ballistics.update(dt, this.targetMgr.getTargets());
+
+    // Дальномер: луч из центра камеры
+    const center = new THREE.Vector2(0, 0);
+    this.raycaster.setFromCamera(center, this.sceneMgr.camera);
+    const intersects = this.raycaster.intersectObjects(
+      this.targetMgr.getTargets().map(t => t.mesh),
+      true
+    );
+    let distance: number | null = null;
+    if (intersects.length > 0) {
+      distance = this.sceneMgr.camera.position.distanceTo(intersects[0].point);
+    }
+    this.ui.updateRangefinder(distance);
+
     this.sceneMgr.renderer.render(this.sceneMgr.scene, this.sceneMgr.camera);
   };
 

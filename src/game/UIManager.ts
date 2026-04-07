@@ -4,12 +4,35 @@ import { EventBus } from './EventBus';
 export class UIManager {
   private scoreEl = document.getElementById('score')!;
   private distEl = document.getElementById('distance')!;
+  private rangefinderEl: HTMLElement;
+  private score = 0;
+
   constructor(eventBus: EventBus) {
-    let score = 0;
-    eventBus.on('bullet_hit', ({ distance }) => {
-      score++;
-      this.scoreEl.textContent = String(score);
-      this.distEl.textContent = `${distance.toFixed(1)} м`;
+    // Создаём элемент дальномера
+    this.rangefinderEl = document.createElement('div');
+    this.rangefinderEl.className = 'rangefinder';
+    this.rangefinderEl.innerHTML = '🎯 --- м';
+    document.body.appendChild(this.rangefinderEl);
+
+    eventBus.on('bullet_hit', (e: Extract<GameEvent, { type: 'bullet_hit' }>) => {
+      this.score++;
+      this.scoreEl.textContent = String(this.score);
+      this.distEl.textContent = `${e.distance.toFixed(1)} м`;
     });
+
+    eventBus.on('reset_game', () => {
+      this.score = 0;
+      this.scoreEl.textContent = '0';
+      this.distEl.textContent = '---';
+    });
+  }
+
+  // Вызывается из Game для обновления дальномера
+  public updateRangefinder(distance: number | null): void {
+    if (distance !== null) {
+      this.rangefinderEl.innerHTML = `🎯 ${distance.toFixed(0)} м`;
+    } else {
+      this.rangefinderEl.innerHTML = `🎯 --- м`;
+    }
   }
 }

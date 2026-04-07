@@ -23,7 +23,9 @@ export class InputController {
 
   private setupListeners(): void {
     this.canvas.addEventListener('click', () => this.canvas.requestPointerLock());
-    document.addEventListener('pointerlockchange', () => { this.mouseLocked = !!document.pointerLockElement; });
+    document.addEventListener('pointerlockchange', () => {
+      this.mouseLocked = !!document.pointerLockElement;
+    });
 
     document.addEventListener('mousemove', (e) => {
       if (!this.mouseLocked) return;
@@ -49,6 +51,13 @@ export class InputController {
       this.camera.fov = THREE.MathUtils.lerp(75, 15, (this.zoomLevel - 1) / 2);
       this.camera.updateProjectionMatrix();
     });
+
+    // Сброс игры по клавише R
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyR' && this.mouseLocked) {
+        this.eventBus.emit({ type: 'reset_game' });
+      }
+    });
   }
 
   public update(time: number): void {
@@ -58,6 +67,11 @@ export class InputController {
     this.camera.rotation.set(this.pitch + sway + this.recoilImpulse, this.yaw, 0);
   }
 
-  public getDirection(out: THREE.Vector3): void { this.camera.getWorldDirection(out); }
-  public getPosition(): THREE.Vector3 { return this.camera.position.clone(); }
+  public getDirection(out: THREE.Vector3): void {
+    this.camera.getWorldDirection(out);
+  }
+
+  public getPosition(): THREE.Vector3 {
+    return this.camera.position.clone();
+  }
 }

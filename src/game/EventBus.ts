@@ -1,24 +1,26 @@
 import { GameEvent } from '../types';
 
-type Listener = (event: GameEvent) => void;
+type Listener<T extends GameEvent> = (event: T) => void;
 
 export class EventBus {
-  private listeners: Map<string, Listener[]> = new Map();
+  private listeners = new Map<string, Set<Listener<any>>>();
 
-  on(type: string, cb: Listener): void {
-    if (!this.listeners.has(type)) this.listeners.set(type, []);
-    this.listeners.get(type)!.push(cb);
+  on<T extends GameEvent>(type: T['type'], cb: Listener<T>): void {
+    if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+    this.listeners.get(type)!.add(cb);
   }
 
-  emit(event: GameEvent): void {
-    const cbs = this.listeners.get(event.type) || [];
-    for (const cb of cbs) cb(event);
+  emit<T extends GameEvent>(event: T): void {
+    const cbs = this.listeners.get(event.type);
+    if (cbs) cbs.forEach(cb => cb(event));
   }
 
-  off(type: string, cb: Listener): void {
-    const arr = this.listeners.get(type);
-    if (arr) this.listeners.set(type, arr.filter(l => l !== cb));
+  off<T extends GameEvent>(type: T['type'], cb: Listener<T>): void {
+    const cbs = this.listeners.get(type);
+    if (cbs) cbs.delete(cb);
   }
 
-  dispose(): void { this.listeners.clear(); }
+  dispose(): void {
+    this.listeners.clear();
+  }
 }

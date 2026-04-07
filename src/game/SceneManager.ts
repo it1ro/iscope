@@ -4,6 +4,7 @@ export class SceneManager {
   public scene: THREE.Scene;
   public camera: THREE.PerspectiveCamera;
   public renderer: THREE.WebGLRenderer;
+  private resizeHandler: () => void;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
@@ -14,7 +15,7 @@ export class SceneManager {
     this.camera.position.set(0, 1.65, 0);
     this.camera.rotation.order = 'YXZ';
 
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -22,7 +23,9 @@ export class SceneManager {
 
     this.setupLights();
     this.setupEnvironment();
-    window.addEventListener('resize', () => this.onWindowResize());
+
+    this.resizeHandler = () => this.onWindowResize();
+    window.addEventListener('resize', this.resizeHandler);
   }
 
   private setupLights(): void {
@@ -32,28 +35,38 @@ export class SceneManager {
     dir.castShadow = true;
     dir.shadow.mapSize.set(1024, 1024);
     this.scene.add(dir);
-    this.scene.add(new THREE.PointLight(0x556688, 0.4, 50).translateX(-5).translateY(5).translateZ(-10));
-    this.scene.add(new THREE.PointLight(0xffaa66, 0.5, 40).translateX(5).translateY(4).translateZ(-8));
+    const fill1 = new THREE.PointLight(0x556688, 0.4, 50);
+    fill1.position.set(-5, 5, -10);
+    this.scene.add(fill1);
+    const fill2 = new THREE.PointLight(0xffaa66, 0.5, 40);
+    fill2.position.set(5, 4, -8);
+    this.scene.add(fill2);
   }
 
   private setupEnvironment(): void {
     const grid = new THREE.GridHelper(200, 30, 0x88aaff, 0x335588);
-    grid.position.y = -0.05; grid.material.transparent = true; grid.material.opacity = 0.5;
+    grid.position.y = -0.05;
+    (grid.material as THREE.Material).transparent = true;
+    (grid.material as THREE.Material).opacity = 0.5;
     this.scene.add(grid);
 
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(180, 180),
       new THREE.MeshStandardMaterial({ color: 0x1a2a3a, roughness: 0.8, metalness: 0.1 })
     );
-    ground.rotation.x = -Math.PI / 2; ground.position.y = -0.1; ground.receiveShadow = true;
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -0.1;
+    ground.receiveShadow = true;
     this.scene.add(ground);
 
     const rockMat = new THREE.MeshStandardMaterial({ color: 0x6a6a6a, roughness: 0.9 });
     for (let i = 0; i < 40; i++) {
       const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.2 + Math.random() * 0.3), rockMat);
-      const a = Math.random() * Math.PI * 2, r = 25 + Math.random() * 55;
-      rock.position.set(Math.cos(a) * r, -0.1 + Math.random() * 0.2, Math.sin(a) * r);
-      rock.scale.set(1, 0.4 + Math.random() * 0.6, 1); rock.castShadow = true;
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 25 + Math.random() * 55;
+      rock.position.set(Math.cos(angle) * radius, -0.1 + Math.random() * 0.2, Math.sin(angle) * radius);
+      rock.scale.set(1, 0.4 + Math.random() * 0.6, 1);
+      rock.castShadow = true;
       this.scene.add(rock);
     }
   }
@@ -64,8 +77,18 @@ export class SceneManager {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  dispose(): void {
+  public dispose(): void {
     this.renderer.dispose();
-    window.removeEventListener('resize', this.onWindowResize);
+    window.removeEventListener('resize', this.resizeHandler);
+    // Очистка сцены
+    this.scene.traverse(obj => {
+      if (obj instanceof THREE.Mesh) {
+        obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
+        }
+      }
+    });
   }
 }
