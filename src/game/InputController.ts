@@ -1,4 +1,4 @@
-// src/game/InputController.ts (полный файл с изменениями)
+// src/game/InputController.ts (обновлён)
 
 import * as THREE from 'three';
 import { EventBus } from './EventBus';
@@ -10,20 +10,19 @@ export class InputController {
   private mouseLocked = false;
   private yaw = Math.PI;
   private pitch = 0.15;
-  private sensitivity = 0.0022;
+  private baseSensitivity = 0.0022;   // базовая чувствительность без зума
   private recoilImpulse = 0;
   
   // Параметры дыхания (пока отключены флагом)
   private breathAmp = 0.004;
   private breathFreq = 1.8;
 
-  // 🔧 ФЛАГ ВРЕМЕННОГО ОТКЛЮЧЕНИЯ ДЫХАНИЯ
   private enableBreathing = false;
 
   // scope settings
   private isScoped = false;
   private hipFov = 75;
-  private scopeMagnification = 4; // PSO-1 ~4x
+  private scopeMagnification = 4;
   private scopeFov = this.hipFov / this.scopeMagnification;
   private fovLerpSpeed = 0.18;
 
@@ -44,8 +43,13 @@ export class InputController {
 
     document.addEventListener('mousemove', (e) => {
       if (!this.mouseLocked) return;
-      this.yaw -= e.movementX * this.sensitivity;
-      this.pitch -= e.movementY * this.sensitivity;
+      
+      // Вычисляем текущий коэффициент зума
+      const zoomFactor = this.hipFov / this.camera.fov;
+      const effectiveSensitivity = this.baseSensitivity / zoomFactor;
+      
+      this.yaw -= e.movementX * effectiveSensitivity;
+      this.pitch -= e.movementY * effectiveSensitivity;
       this.pitch = THREE.MathUtils.clamp(this.pitch, -Math.PI / 2.4, Math.PI / 2.4);
     });
 
@@ -53,7 +57,7 @@ export class InputController {
       if (e.button === 0 && this.mouseLocked) {
         e.preventDefault();
         this.recoilImpulse = 0.04;
-        const pos = this.getMuzzlePosition(); // 🔁 новая точка вылета
+        const pos = this.getMuzzlePosition();
         const dir = new THREE.Vector3();
         this.getDirection(dir);
         this.eventBus.emit({ type: 'shoot', startPos: pos, direction: dir });
@@ -106,13 +110,9 @@ export class InputController {
     return this.camera.position.clone();
   }
 
-  /**
-   * Возвращает точку вылета пули со смещением 5 см вниз относительно камеры
-   * (имитация высоты прицела над осью ствола).
-   */
   public getMuzzlePosition(): THREE.Vector3 {
     const pos = this.camera.position.clone();
-    pos.y -= 0.05; // 5 см вниз
+    pos.y -= 0.05;
     return pos;
   }
 

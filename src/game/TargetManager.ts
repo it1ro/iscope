@@ -1,3 +1,5 @@
+// src/game/TargetManager.ts
+
 import * as THREE from 'three';
 import { Target, GameEvent } from '../types';
 import { EventBus } from './EventBus';
@@ -5,9 +7,12 @@ import { EventBus } from './EventBus';
 export class TargetManager {
   private scene: THREE.Scene;
   private targets: Target[] = [];
-  private readonly MAX_TARGETS = 10;
-  private distances = [25, 50, 75, 100, 150, 200, 250, 300, 350, 400];
-  private groundY = -0.15; // уровень земли
+  private groundY = -0.15;
+
+  // Расширенный набор дистанций до 650 м
+  private distances = [
+    25, 40, 60, 80, 100, 120, 150, 180, 200, 230, 260, 290, 320, 350, 380, 400
+  ];
 
   constructor(scene: THREE.Scene, eventBus: EventBus) {
     this.scene = scene;
@@ -15,7 +20,9 @@ export class TargetManager {
 
     eventBus.on('bullet_hit', (e: Extract<GameEvent, { type: 'bullet_hit' }>) => {
       this.destroyTarget(e.target);
-      this.spawnNewTarget();
+      if (this.targets.length === 0) {
+        this.resetAllTargets();
+      }
     });
     eventBus.on('reset_game', () => this.resetAllTargets());
   }
@@ -24,9 +31,13 @@ export class TargetManager {
     this.targets.forEach(t => this.disposeGroup(t.mesh));
     this.targets = [];
 
+    // Создаём цель на каждую дистанцию с большим случайным боковым смещением
     this.distances.forEach(dist => {
-      const xOffset = (Math.random() - 0.5) * 6;
-      this.targets.push(this.createHumanTarget(dist, xOffset));
+      // Случайное смещение по X от -10 до +10 метров
+      const xOffset = (Math.random() - 0.5) * 20;
+      // Небольшое дополнительное смещение по Z, чтобы цели не стояли строго на одной линии
+      const zOffset = (Math.random() - 0.5) * 5;
+      this.targets.push(this.createHumanTarget(dist + zOffset, xOffset));
     });
   }
 
@@ -36,7 +47,6 @@ export class TargetManager {
     const width = 0.6;
     const height = 1.75;
     
-    // Материал мишени (зелёный, матовый)
     const material = new THREE.MeshStandardMaterial({
       color: 0x4a6b3a,
       roughness: 0.8,
@@ -45,18 +55,16 @@ export class TargetManager {
     });
     
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
-    plane.position.y = height / 2; // центр плоскости по высоте
+    plane.position.y = height / 2;
     plane.castShadow = true;
     plane.receiveShadow = false;
     group.add(plane);
     
-    // Контур для видимости
     const edges = new THREE.EdgesGeometry(plane.geometry);
     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x2a3a1a }));
     line.position.copy(plane.position);
     group.add(line);
     
-    // Невидимая коллизия
     const collisionPlane = new THREE.Mesh(
       new THREE.PlaneGeometry(width, height),
       new THREE.MeshBasicMaterial({ visible: false })
@@ -65,30 +73,22 @@ export class TargetManager {
     group.add(collisionPlane);
     (group as any).collisionMeshes = [collisionPlane];
     
-    // Размещаем группу так, чтобы низ мишени был на уровне земли
-    const centerY = this.groundY + height / 2; // -0.15 + 0.875 = 0.725
+    const centerY = this.groundY + height / 2;
     group.position.set(xOffset, centerY, rangeMeters);
     
-    // Поворачиваем лицом к игроку (0, 1.65, 0), но без вертикального наклона
+    // Поворот к игроку
     const targetLookAt = new THREE.Vector3(0, centerY, 0);
     group.lookAt(targetLookAt);
     
     this.scene.add(group);
     
     return {
-      id: `human_${rangeMeters}_${xOffset}`,
+      id: `human_${rangeMeters.toFixed(1)}_${xOffset.toFixed(1)}_${Date.now() + Math.random()}`,
       mesh: group,
       position: new THREE.Vector3(xOffset, centerY, rangeMeters),
       radius: Math.max(width, height) / 2,
       hits: []
     };
-  }
-
-  private spawnNewTarget(): void {
-    const dist = this.distances[Math.floor(Math.random() * this.distances.length)];
-    const xOffset = (Math.random() - 0.5) * 6;
-    const newTarget = this.createHumanTarget(dist, xOffset);
-    this.targets.push(newTarget);
   }
 
   private destroyTarget(target: Target): void {
