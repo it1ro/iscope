@@ -163,41 +163,42 @@ export class AudioManager {
   
   const distance = event.distance;
   
-  // --- Реалистичная модель громкости ---
+  // --- Улучшенная модель громкости с более крутым затуханием ---
   let volumeFactor: number;
   if (distance <= 200) {
-    // Ближняя зона: почти полная громкость с небольшим спадом к 200 м
-    volumeFactor = 1.0 - (distance / 200) * 0.3; // 1.0 → 0.7 на 200 м
+    // Ближняя зона: более резкое падение к 200 м (1.0 → 0.5)
+    volumeFactor = 1.0 - (distance / 200) * 0.5;
   } else {
-    // Дальняя зона: комбинация геометрического спада и атмосферного поглощения
+    // Дальняя зона: усиленное геометрическое затухание и поглощение
     const refDist = 200;
-    const absorptionCoeff = 0.0015; // дБ/м (типичное значение для средних частот)
+    const absorptionCoeff = 0.003; // дБ/м (увеличено для большей крутизны)
     
-    // Геометрическое затухание (~ обратный квадрат с показателем 1.8)
-    const geoFalloff = Math.pow(refDist / distance, 1.8);
+    // Геометрическое затухание: показатель степени увеличен с 1.8 до 2.5
+    const geoFalloff = Math.pow(refDist / distance, 2.5);
     // Атмосферное поглощение (в линейном масштабе)
     const airLoss = Math.pow(10, -absorptionCoeff * (distance - refDist) / 20);
     
-    volumeFactor = 0.7 * geoFalloff * airLoss;
+    volumeFactor = 0.5 * geoFalloff * airLoss; // начальный уровень 0.5 вместо 0.7
   }
   
-  // Ограничиваем минимальную громкость
+  // --- Уменьшение базовой громкости в 1.5 раза ---
+  volumeFactor *= 2 / 3; // ≈ 0.6667
+  
+  // Ограничиваем минимальную громкость (оставляем тот же порог 0.08)
   volumeFactor = Math.max(0.08, volumeFactor);
   
-  // --- Реалистичная модель высоты тона (питча) ---
+  // --- Реалистичная модель высоты тона (питча) остаётся без изменений ---
   let pitchFactor: number;
   if (distance <= 200) {
-    pitchFactor = 0.95 + Math.random() * 0.1; // естественный разброс
+    pitchFactor = 0.95 + Math.random() * 0.1;
   } else {
-    // Падение частоты из-за большего поглощения высоких частот в воздухе
-    // и эффекта удалённости
     const freqAttenuation = Math.exp(-0.0012 * (distance - 200));
     pitchFactor = Math.max(0.2, 0.9 * freqAttenuation);
   }
   
-  // --- Естественная случайность ---
-  pitchFactor *= 0.94 + Math.random() * 0.12;   // ±6%
-  volumeFactor *= 0.92 + Math.random() * 0.16;  // ±8%
+  // Естественная случайность
+  pitchFactor *= 0.94 + Math.random() * 0.12;
+  volumeFactor *= 0.92 + Math.random() * 0.16;
   
   // Создаём плеер
   const player = new Tone.Player(this.hitBuffer);
@@ -211,10 +212,7 @@ export class AudioManager {
   const originalThreshold = this.compressor.threshold.value;
   const originalRatio = this.compressor.ratio.value;
   
-  // Явный реверб
   this.reverb.wet.rampTo(0.6, 0.01);
-  
-  // Агрессивная компрессия для «хлёсткого» попадания
   this.compressor.threshold.rampTo(-24, 0.01);
   this.compressor.ratio.rampTo(8, 0.01);
   
