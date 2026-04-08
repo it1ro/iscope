@@ -44,26 +44,6 @@
 
   <!-- Статические шевроны удалены — они будут генерироваться динамически в Reticle -->
 
-  <!-- Дальномерная шкала (левая) -->
-  <g id="rangefinder" transform="translate(130, 500)">
-    <line x1="0" y1="-180" x2="25" y2="-180" class="main-line"/>
-    <text x="32" y="-177" class="label">2</text>
-
-    <line x1="0" y1="-90" x2="25" y2="-90" class="main-line"/>
-    <text x="32" y="-87" class="label">4</text>
-
-    <line x1="0" y1="-60" x2="18" y2="-60" class="thin-line"/>
-    <text x="24" y="-57" class="label-small">6</text>
-
-    <line x1="0" y1="-45" x2="14" y2="-45" class="thin-line"/>
-    <text x="20" y="-42" class="label-small">8</text>
-
-    <line x1="0" y1="-36" x2="10" y2="-36" class="thin-line"/>
-    <text x="16" y="-33" class="label-small">10</text>
-
-    <line x1="0" y1="-200" x2="0" y2="150" class="thin-line"/>
-  </g>
-
   <!-- Шкала боковых поправок (нижняя) -->
   <g id="windage" transform="translate(500, 500)">
     <!-- Левые деления -->

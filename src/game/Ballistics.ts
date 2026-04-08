@@ -47,13 +47,14 @@ export class Ballistics {
     this.trailGeo.setAttribute('position', this.trailAttr);
     this.trailGeo.setDrawRange(0, 0);
 
+    // Улучшенный материал трассера: ярче, крупнее точки, больше непрозрачность
     this.trailMesh = new THREE.Points(
       this.trailGeo,
       new THREE.PointsMaterial({
-        color: 0xff8844,
-        size: 0.06,
+        color: 0xffcc00,        // ярко-жёлтый
+        size: 0.12,             // увеличено с 0.06
         transparent: true,
-        opacity: 0.65,
+        opacity: 0.85,          // увеличено с 0.65
         blending: THREE.AdditiveBlending,
         depthWrite: false
       })
@@ -74,15 +75,16 @@ export class Ballistics {
 
     const sphereGeo = new THREE.SphereGeometry(0.12, 16, 16);
     const sphereMat = new THREE.MeshStandardMaterial({
-      color: 0xff6600,
-      emissive: 0xff4400,
-      emissiveIntensity: 0.9
+      color: 0xffaa00,           // ярко-жёлтый
+      emissive: 0xff8800,        // оранжевое свечение
+      emissiveIntensity: 1.8     // увеличено с 0.9
     });
     const mesh = new THREE.Mesh(sphereGeo, sphereMat);
     mesh.position.copy(startPos);
     mesh.castShadow = true;
 
-    const light = new THREE.PointLight(0xff6600, 1.5, 12);
+    // Более яркий и дальний источник света
+    const light = new THREE.PointLight(0xffaa00, 3.5, 20); // интенсивность 3.5 (было 1.5), дальность 20 (было 12)
     mesh.add(light);
     this.scene.add(mesh);
 
