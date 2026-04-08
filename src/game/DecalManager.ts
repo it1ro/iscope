@@ -11,7 +11,7 @@ export class DecalManager {
   private decalTexture: THREE.Texture;
   private baseMaterial: THREE.MeshStandardMaterial;
 
-  constructor(scene: THREE.Scene, decalTextureUrl = '/assets/bullet_hole.png') {
+  constructor(scene: THREE.Scene, decalTextureUrl = '/assets/images/bullet_hole.png') {
     this.scene = scene;
     this.decalTexture = new THREE.TextureLoader().load(decalTextureUrl);
     this.baseMaterial = new THREE.MeshStandardMaterial({

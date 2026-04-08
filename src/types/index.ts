@@ -7,6 +7,9 @@ export interface Target {
   radius: number;
   // Список попаданий (точка, нормаль и ссылка на декаль, если создана)
   hits?: Array<{ point: THREE.Vector3; normal: THREE.Vector3; decalMesh?: THREE.Mesh }>;
+  // Новые поля для отслеживания состояния
+  isHit?: boolean;
+  planeMaterial?: THREE.MeshStandardMaterial; // ссылка на материал плоскости
 }
 
 export interface BulletState {

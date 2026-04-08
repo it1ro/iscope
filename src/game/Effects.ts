@@ -12,7 +12,7 @@ export class Effects {
   constructor(scene: THREE.Scene, eventBus: EventBus) {
     this.scene = scene;
     this.eventBus = eventBus;
-    this.decalManager = new DecalManager(scene, '/assets/bullet_hole.png');
+    this.decalManager = new DecalManager(scene, '/assets/images/bullet_hole.png');
     this.eventBus.on('bullet_hit', (e: Extract<GameEvent, { type: 'bullet_hit' }>) => {
       this.spawnHitMarker();
       this.spawnImpactParticles(e.hitPoint);

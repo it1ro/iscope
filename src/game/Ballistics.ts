@@ -1,3 +1,5 @@
+// src/game/Ballistics.ts
+
 import * as THREE from 'three';
 import { BulletState, Target, GameEvent } from '../types';
 import { EventBus } from './EventBus';
@@ -34,7 +36,6 @@ export class Ballistics {
   private tmpGrav = new THREE.Vector3(0, -this.gravity, 0);
 
   private shootHandler: (e: GameEvent) => void;
-  private targetMeshCache = new WeakMap<Target, THREE.Object3D[]>();
 
   constructor(scene: THREE.Scene, eventBus: EventBus) {
     this.scene = scene;
@@ -138,22 +139,18 @@ export class Ballistics {
 
     this.pushTrail(mesh.position);
 
+    // Сбор коллизионных мешей только для НЕ поражённых целей
     const targetMeshes: THREE.Object3D[] = [];
     for (const t of targets) {
-      let cached = this.targetMeshCache.get(t);
-      if (!cached) {
-        cached = [];
-        const anyT = t as any;
-        if (Array.isArray(anyT.collisionMeshes) && anyT.collisionMeshes.length > 0) {
-          cached.push(...anyT.collisionMeshes);
-        } else {
-          t.mesh.traverse((obj) => {
-            if ((obj as THREE.Mesh).isMesh) cached!.push(obj);
-          });
-        }
-        this.targetMeshCache.set(t, cached);
+      if (t.isHit) continue; // пропускаем уже поражённые цели
+      const anyT = t as any;
+      if (Array.isArray(anyT.collisionMeshes) && anyT.collisionMeshes.length > 0) {
+        targetMeshes.push(...anyT.collisionMeshes);
+      } else {
+        t.mesh.traverse((obj) => {
+          if ((obj as THREE.Mesh).isMesh) targetMeshes.push(obj);
+        });
       }
-      targetMeshes.push(...cached);
     }
 
     if (dist > 1e-6 && targetMeshes.length > 0) {
@@ -161,34 +158,29 @@ export class Ballistics {
       this.raycaster.near = 0;
       this.raycaster.far = dist;
       const hits = this.raycaster.intersectObjects(targetMeshes, true);
+      
       if (hits.length > 0) {
-        const hit = hits[0];
-        let hitNormal = new THREE.Vector3();
-        if (hit.face) {
-          const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
-          hitNormal.copy(hit.face.normal).applyMatrix3(normalMatrix).normalize();
-        } else {
-          hitNormal.copy(this.tmpDir).negate();
-        }
-
-        let obj: THREE.Object3D | null = hit.object;
-        let foundTarget: Target | undefined;
-        while (obj) {
-          foundTarget = targets.find(t => t.mesh === obj);
-          if (foundTarget) break;
-          obj = obj.parent;
-        }
-
-        if (!foundTarget) {
-          obj = hit.object.parent;
+        // Перебираем все попадания, но берём первое, принадлежащее НЕ поражённой цели
+        for (const hit of hits) {
+          let obj: THREE.Object3D | null = hit.object;
+          let foundTarget: Target | undefined;
           while (obj) {
-            foundTarget = targets.find(t => t.mesh === obj);
+            foundTarget = (obj.userData as any).target as Target | undefined;
             if (foundTarget) break;
             obj = obj.parent;
           }
-        }
+          if (!foundTarget) continue;
+          if (foundTarget.isHit) continue; // на всякий случай (вдруг что-то просочилось)
 
-        if (foundTarget) {
+          // Вычисляем нормаль
+          let hitNormal = new THREE.Vector3();
+          if (hit.face) {
+            const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+            hitNormal.copy(hit.face.normal).applyMatrix3(normalMatrix).normalize();
+          } else {
+            hitNormal.copy(this.tmpDir).negate();
+          }
+
           this.eventBus.emit({
             type: 'bullet_hit',
             target: foundTarget,
@@ -197,12 +189,11 @@ export class Ballistics {
             hitNormal: hitNormal.clone(),
             hitObject: hit.object
           } as any);
-        } else {
-          console.warn('Попадание в объект, но цель не найдена');
-        }
 
-        this.cleanup();
-        return;
+          this.cleanup();
+          return;
+        }
+        // Если все пересечения оказались с поражёнными целями — пуля летит дальше
       }
     }
 
@@ -264,7 +255,6 @@ export class Ballistics {
     this.cleanup();
     if (this.trailMesh.parent) this.trailMesh.parent.remove(this.trailMesh);
     if (this.trailGeo && typeof this.trailGeo.dispose === 'function') this.trailGeo.dispose();
-    this.targetMeshCache = new WeakMap();
   }
 
   private getCrossSectionArea(): number {
