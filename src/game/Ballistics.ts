@@ -208,11 +208,9 @@ export class Ballistics {
 
     prevPosition.copy(mesh.position);
 
-    // Увеличенные границы (Z до 500, X до 200)
+    // Условие удаления пули: упала ниже земли или превышен таймаут (8 секунд)
     if (
       mesh.position.y < -0.2 ||
-      Math.abs(mesh.position.x) > 200 ||
-      mesh.position.z > 500 ||
       (performance.now() - this.bullet.startTime) > 8000
     ) {
       this.cleanup();
