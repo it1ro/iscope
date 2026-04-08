@@ -6,7 +6,7 @@ export class GrassManager {
   private scene: THREE.Scene;
   private grassMesh: THREE.InstancedMesh | null = null;
   private readonly count = 6000;
-  private readonly radius = 260; // УВЕЛИЧЕНО
+  private readonly radius = 260;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -43,7 +43,6 @@ export class GrassManager {
       const y = -0.1 + (Math.random() - 0.5) * 0.04;
 
       dummy.rotation.y = Math.random() * Math.PI * 2;
-
       dummy.rotation.x = (Math.random() - 0.5) * 0.1;
       dummy.rotation.z = (Math.random() - 0.5) * 0.1;
 
@@ -55,9 +54,10 @@ export class GrassManager {
       dummy.updateMatrix();
       this.grassMesh.setMatrixAt(i, dummy.matrix);
 
+      // Более светлые оттенки травы
       const hue = 0.24 + Math.random() * 0.18;
       const saturation = 0.5 + Math.random() * 0.45;
-      const lightness = 0.3 + Math.random() * 0.4;
+      const lightness = 0.45 + Math.random() * 0.35; // было 0.3+0.4
       color.setHSL(hue, saturation, lightness);
       this.grassMesh.setColorAt(i, color);
     }

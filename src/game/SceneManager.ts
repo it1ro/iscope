@@ -16,7 +16,7 @@ export class SceneManager {
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
     this.scene.background = null;
-    this.scene.fog = new THREE.Fog(0xd4e0d0, 400, 900); // адаптировано под большую карту
+    this.scene.fog = new THREE.Fog(0xd4e0d0, 400, 900);
 
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 800);
     this.camera.position.set(0, 1.65, 0);
@@ -29,7 +29,7 @@ export class SceneManager {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.8;
+    this.renderer.toneMappingExposure = 2.0;
 
     this.loadHDRI('/assets/evening-field.hdr');
 
@@ -60,8 +60,8 @@ export class SceneManager {
 
       this.scene.environment = envMap;
       this.scene.background = envMap;
-      this.scene.backgroundIntensity = 1.2;
-      this.scene.environmentIntensity = 1.5;
+      this.scene.backgroundIntensity = 1.4;
+      this.scene.environmentIntensity = 2.0;
 
       texture.dispose();
       pmremGenerator.dispose();
@@ -71,11 +71,11 @@ export class SceneManager {
   }
 
   private setupLights(): void {
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 
-    this.sunLight = new THREE.DirectionalLight(0xfff5e6, 1.1);
-    this.sunLight.position.set(30, 40, -30);
-    this.sunLight.target.position.set(0, 0, 40);
+    this.sunLight = new THREE.DirectionalLight(0xfff5e6, 2.2);
+    this.sunLight.position.set(-30, 40, 30);
+    this.sunLight.target.position.set(0, 0, 50);
     this.scene.add(this.sunLight.target);
 
     this.sunLight.castShadow = true;
@@ -89,41 +89,57 @@ export class SceneManager {
     this.sunLight.shadow.bias = -0.0003;
     this.scene.add(this.sunLight);
 
-    const fillFront = new THREE.PointLight(0xccddff, 0.25, 150);
+    const backLight = new THREE.DirectionalLight(0xaaccff, 0.6);
+    backLight.position.set(20, 15, -40);
+    backLight.target.position.set(0, 0, 20);
+    this.scene.add(backLight.target);
+    this.scene.add(backLight);
+
+    const fillFront = new THREE.PointLight(0xccddff, 0.35, 150);
     fillFront.position.set(0, 5, 35);
     this.scene.add(fillFront);
 
-    const fillFront2 = new THREE.PointLight(0xffeedd, 0.4, 120);
+    const fillFront2 = new THREE.PointLight(0xffeedd, 0.5, 120);
     fillFront2.position.set(8, 5, 30);
     this.scene.add(fillFront2);
 
-    const groundBounce = new THREE.PointLight(0x7a8a6a, 0.2, 60);
+    const groundBounce = new THREE.PointLight(0x7a8a6a, 0.3, 60);
     groundBounce.position.set(0, -1, 15);
     this.scene.add(groundBounce);
   }
 
   private setupGroundAndRocks(): void {
-    // Увеличенная плоскость (350x350)
+    // --- Текстура травы для земли ---
+    const textureLoader = new THREE.TextureLoader();
+    const grassTexture = textureLoader.load('/assets/textures/grass_ground.png');
+    grassTexture.wrapS = THREE.RepeatWrapping;
+    grassTexture.wrapT = THREE.RepeatWrapping;
+    grassTexture.repeat.set(70, 70); // 350/70 = 5 метров на повтор, достаточно мелко
+
+    const groundMaterial = new THREE.MeshStandardMaterial({
+      map: grassTexture,
+      roughness: 0.9,
+      metalness: 0.01,
+      color: 0xffffff, // используем цвет текстуры без затемнения
+    });
+
     const ground = new THREE.Mesh(
       new THREE.PlaneGeometry(350, 350),
-      new THREE.MeshStandardMaterial({
-        color: 0x6a7e5a,
-        roughness: 0.95,
-        metalness: 0.01,
-        emissive: new THREE.Color(0x222200)
-      })
+      groundMaterial
     );
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.15;
     ground.receiveShadow = true;
     this.scene.add(ground);
 
+    // Лёгкая вспомогательная сетка (едва заметная) для ориентира
     const grid = new THREE.GridHelper(350, 70, 0xaaccdd, 0x6688aa);
     grid.position.y = -0.1;
     (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.1;
+    (grid.material as THREE.Material).opacity = 0.05;
     this.scene.add(grid);
 
+    // Камни
     const rockMat = new THREE.MeshStandardMaterial({
       color: 0x9a8a7a,
       roughness: 0.9,
