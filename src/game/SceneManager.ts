@@ -39,32 +39,36 @@ export class SceneManager {
   }
 
   private setupLights(): void {
-    this.scene.add(new THREE.AmbientLight(0x404060, 0.4));
+  // Тёплое ambient освещение
+  this.scene.add(new THREE.AmbientLight(0xfff5e6, 0.7));
 
-    this.sunLight = new THREE.DirectionalLight(0xfff5d1, 1.8);
-    this.sunLight.position.set(0, 35, -40);
-    this.sunLight.target.position.set(0, 0, 40);
-    this.scene.add(this.sunLight.target);
-    
-    this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.set(2048, 2048);
-    this.sunLight.shadow.camera.near = 1;
-    this.sunLight.shadow.camera.far = 120;
-    this.sunLight.shadow.camera.left = -40;
-    this.sunLight.shadow.camera.right = 40;
-    this.sunLight.shadow.camera.top = 40;
-    this.sunLight.shadow.camera.bottom = -40;
-    this.sunLight.shadow.bias = -0.0005;
-    this.scene.add(this.sunLight);
+  // Солнце – основной направленный свет
+  this.sunLight = new THREE.DirectionalLight(0xfff0e0, 2.2);
+  this.sunLight.position.set(60, 35, -70); // будет перезаписано в setupSky
+  this.sunLight.target.position.set(0, 0, 30);
+  this.scene.add(this.sunLight.target);
+  
+  this.sunLight.castShadow = true;
+  this.sunLight.shadow.mapSize.set(2048, 2048);
+  this.sunLight.shadow.camera.near = 1;
+  this.sunLight.shadow.camera.far = 150;
+  this.sunLight.shadow.camera.left = -50;
+  this.sunLight.shadow.camera.right = 50;
+  this.sunLight.shadow.camera.top = 50;
+  this.sunLight.shadow.camera.bottom = -50;
+  this.sunLight.shadow.bias = -0.0003;
+  this.scene.add(this.sunLight);
 
-    const fillFront = new THREE.PointLight(0xccddff, 0.35, 80);
-    fillFront.position.set(0, 8, 20);
-    this.scene.add(fillFront);
-    
-    const fillSide = new THREE.PointLight(0xffaa88, 0.25, 60);
-    fillSide.position.set(-15, 6, -10);
-    this.scene.add(fillSide);
-  }
+  // Мягкий заполняющий свет спереди
+  const fillFront = new THREE.PointLight(0xccddff, 0.3, 100);
+  fillFront.position.set(0, 5, 25);
+  this.scene.add(fillFront);
+
+  // Отражённый свет от земли (снизу)
+  const groundBounce = new THREE.PointLight(0x6a7a5a, 0.2, 40);
+  groundBounce.position.set(0, -1, 10);
+  this.scene.add(groundBounce);
+}
 
   private setupSky(): void {
     this.sky = new Sky();
@@ -84,34 +88,45 @@ export class SceneManager {
   }
 
   private setupGroundAndRocks(): void {
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(180, 180),
-      new THREE.MeshStandardMaterial({ color: 0x2a3a2a, roughness: 0.9, metalness: 0.05 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.15;
-    ground.receiveShadow = true;
-    this.scene.add(ground);
+  // Основная земля – тёплый натуральный цвет
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(200, 200),
+    new THREE.MeshStandardMaterial({ 
+      color: 0x5c6e4a,       // оливково-коричневый
+      roughness: 0.95, 
+      metalness: 0.01,
+      emissive: new THREE.Color(0x111100) // лёгкое тепло от земли
+    })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -0.15;
+  ground.receiveShadow = true;
+  this.scene.add(ground);
 
-    const grid = new THREE.GridHelper(200, 30, 0x88aaff, 0x446688);
-    grid.position.y = -0.1;
-    (grid.material as THREE.Material).transparent = true;
-    (grid.material as THREE.Material).opacity = 0.25;
-    this.scene.add(grid);
+  // Опционально: лёгкая сетка для ощущения масштаба (очень прозрачная)
+  const grid = new THREE.GridHelper(200, 40, 0x88aacc, 0x557799);
+  grid.position.y = -0.1;
+  (grid.material as THREE.Material).transparent = true;
+  (grid.material as THREE.Material).opacity = 0.15;
+  this.scene.add(grid);
 
-    // 🔁 Увеличен радиус разброса камней до 150 м
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x7a7a7a, roughness: 0.85 });
-    for (let i = 0; i < 30; i++) {
-      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.2 + Math.random() * 0.4), rockMat);
-      const angle = Math.random() * Math.PI * 2;
-      const radius = 30 + Math.random() * 120; // до 150 м
-      rock.position.set(Math.cos(angle) * radius, -0.1 + Math.random() * 0.2, Math.sin(angle) * radius);
-      rock.scale.set(1, 0.4 + Math.random() * 0.8, 1);
-      rock.castShadow = true;
-      rock.receiveShadow = true;
-      this.scene.add(rock);
-    }
+  // Камни – немного теплее и разнообразнее
+  const rockMat = new THREE.MeshStandardMaterial({ 
+    color: 0x9a8a7a, 
+    roughness: 0.9,
+    emissive: new THREE.Color(0x221100)
+  });
+  for (let i = 0; i < 30; i++) {
+    const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(0.2 + Math.random() * 0.5), rockMat);
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 20 + Math.random() * 130;
+    rock.position.set(Math.cos(angle) * radius, -0.1 + Math.random() * 0.3, Math.sin(angle) * radius);
+    rock.scale.set(1, 0.5 + Math.random() * 0.9, 1);
+    rock.castShadow = true;
+    rock.receiveShadow = true;
+    this.scene.add(rock);
   }
+}
 
   private onWindowResize(): void {
     this.camera.aspect = window.innerWidth / window.innerHeight;
