@@ -1,12 +1,12 @@
-// src/game/GrassManager.ts (уточнённые параметры)
+// src/game/GrassManager.ts
 
 import * as THREE from 'three';
 
 export class GrassManager {
   private scene: THREE.Scene;
   private grassMesh: THREE.InstancedMesh | null = null;
-  private readonly count = 6000;               // уменьшено вдвое
-  private readonly radius = 150;
+  private readonly count = 6000;
+  private readonly radius = 260; // УВЕЛИЧЕНО
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -39,19 +39,17 @@ export class GrassManager {
       const r = Math.pow(Math.random(), 1.5) * this.radius;
       const x = Math.cos(angle) * r;
       const z = Math.sin(angle) * r;
-      
+
       const y = -0.1 + (Math.random() - 0.5) * 0.04;
 
       dummy.rotation.y = Math.random() * Math.PI * 2;
 
-      // Минимальные наклоны (едва заметные)
-      dummy.rotation.x = (Math.random() - 0.5) * 0.1;   // ~ ±0.05 рад (3°)
+      dummy.rotation.x = (Math.random() - 0.5) * 0.1;
       dummy.rotation.z = (Math.random() - 0.5) * 0.1;
 
-      // Высота в 1.5 раза больше (0.45 – 1.2)
       const heightScale = 0.45 + Math.random() * 0.75;
       const widthScale = 0.4 + Math.random() * 0.5;
-      
+
       dummy.scale.set(widthScale, heightScale, 1);
       dummy.position.set(x, y, z);
       dummy.updateMatrix();

@@ -39,76 +39,115 @@ export class TargetManager {
     });
   }
 
-  private createHumanTarget(rangeMeters: number, xOffset = 0): Target {
-    const group = new THREE.Group();
-    
-    const width = 0.6;
-    const height = 1.75;
-    
-    const material = new THREE.MeshStandardMaterial({
-      color: 0x4a6b3a,
-      roughness: 0.8,
-      emissive: new THREE.Color(0x111111),
-      side: THREE.DoubleSide
-    });
-    
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
-    plane.position.y = height / 2;
-    plane.castShadow = true;
-    plane.receiveShadow = false;
-    group.add(plane);
-    
-    const edges = new THREE.EdgesGeometry(plane.geometry);
-    const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x2a3a1a }));
-    line.position.copy(plane.position);
-    group.add(line);
-    
-    const collisionPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(width, height),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    collisionPlane.position.y = height / 2;
-    group.add(collisionPlane);
-    (group as any).collisionMeshes = [collisionPlane];
-    
-    const centerY = this.groundY + height / 2;
-    group.position.set(xOffset, centerY, rangeMeters);
-    
-    const targetLookAt = new THREE.Vector3(0, centerY, 0);
-    group.lookAt(targetLookAt);
-    
-    this.scene.add(group);
-    
-    const target: Target = {
-      id: `human_${rangeMeters.toFixed(1)}_${xOffset.toFixed(1)}_${Date.now() + Math.random()}`,
-      mesh: group,
-      position: new THREE.Vector3(xOffset, centerY, rangeMeters),
-      radius: Math.max(width, height) / 2,
-      hits: [],
-      isHit: false,
-      planeMaterial: material,
-    };
+  // src/game/TargetManager.ts (полная замена метода создания мишени)
 
-    group.userData.target = target;
-    collisionPlane.userData.target = target;
+private createHumanTarget(rangeMeters: number, xOffset = 0): Target {
+  const group = new THREE.Group();
 
-    return target;
-  }
+  // --- Материалы ---
+  // Основной материал хаки (начальный)
+  const khakiMaterial = new THREE.MeshStandardMaterial({
+    color: 0x7a7a4a,        // хаки
+    roughness: 0.7,
+    emissive: new THREE.Color(0x111100)
+  });
+
+  // Материал для контура (проволочный каркас)
+  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x3a3a2a });
+
+  // --- Голова (сфера) ---
+  const headGeo = new THREE.SphereGeometry(0.18, 16, 12);
+  const headMesh = new THREE.Mesh(headGeo, khakiMaterial.clone()); // клон для независимого изменения цвета
+  headMesh.position.y = 1.55;
+  headMesh.castShadow = true;
+  headMesh.receiveShadow = false;
+  group.add(headMesh);
+
+  // Контур головы
+  const headEdges = new THREE.EdgesGeometry(headGeo);
+  const headLine = new THREE.LineSegments(headEdges, lineMaterial);
+  headLine.position.copy(headMesh.position);
+  group.add(headLine);
+
+  // --- Торс (прямоугольный бокс) ---
+  const torsoWidth = 0.55;
+  const torsoHeight = 1.0;
+  const torsoDepth = 0.2;
+  const torsoGeo = new THREE.BoxGeometry(torsoWidth, torsoHeight, torsoDepth);
+  const torsoMesh = new THREE.Mesh(torsoGeo, khakiMaterial.clone());
+  torsoMesh.position.y = 0.5 + torsoHeight/2; // центр на высоте 1.0 м
+  torsoMesh.castShadow = true;
+  torsoMesh.receiveShadow = false;
+  group.add(torsoMesh);
+
+  // Контур торса
+  const torsoEdges = new THREE.EdgesGeometry(torsoGeo);
+  const torsoLine = new THREE.LineSegments(torsoEdges, lineMaterial);
+  torsoLine.position.copy(torsoMesh.position);
+  group.add(torsoLine);
+
+  // --- Коллизионные меши (невидимые) ---
+  const collisionMeshes: THREE.Mesh[] = [];
+
+  const headCollision = new THREE.Mesh(headGeo, new THREE.MeshBasicMaterial({ visible: false }));
+  headCollision.position.copy(headMesh.position);
+  group.add(headCollision);
+  collisionMeshes.push(headCollision);
+
+  const torsoCollision = new THREE.Mesh(torsoGeo, new THREE.MeshBasicMaterial({ visible: false }));
+  torsoCollision.position.copy(torsoMesh.position);
+  group.add(torsoCollision);
+  collisionMeshes.push(torsoCollision);
+
+  (group as any).collisionMeshes = collisionMeshes;
+
+  // Позиционирование всей группы
+  const centerY = this.groundY + 0.5; // основание торса примерно на уровне земли
+  group.position.set(xOffset, centerY, rangeMeters);
+
+  // Поворот лицом к игроку (начало координат)
+  const targetLookAt = new THREE.Vector3(0, centerY, 0);
+  group.lookAt(targetLookAt);
+
+  this.scene.add(group);
+
+  const target: Target = {
+    id: `human_${rangeMeters.toFixed(1)}_${xOffset.toFixed(1)}_${Date.now() + Math.random()}`,
+    mesh: group,
+    position: new THREE.Vector3(xOffset, centerY, rangeMeters),
+    radius: 1.0, // примерный bounding sphere
+    hits: [],
+    isHit: false,
+    planeMaterial: undefined, // больше не используется, но оставим для совместимости
+  };
+
+  // Сохраняем ссылки на материалы для смены цвета при попадании
+  (group.userData as any).materials = [headMesh.material, torsoMesh.material];
+  group.userData.target = target;
+  collisionMeshes.forEach(cm => cm.userData.target = target);
+
+  return target;
+}
 
   private handleHit(target: Target): void {
-    if (target.isHit) return; // уже поражена и ожидает удаления
-    target.isHit = true;
-    if (target.planeMaterial) {
-      target.planeMaterial.color.setHex(0xff6600);
-      target.planeMaterial.emissive?.setHex(0x442200);
-    }
+  if (target.isHit) return;
+  target.isHit = true;
 
-    // Запускаем таймер на удаление через 5 секунд
-    const timeoutId = window.setTimeout(() => {
-      this.removeTarget(target);
-    }, 5000);
-    this.removalTimeouts.set(target.id, timeoutId);
+  // Меняем цвет всех материалов на оранжевый
+  const materials = (target.mesh.userData as any).materials as THREE.MeshStandardMaterial[];
+  if (materials) {
+    materials.forEach(mat => {
+      mat.color.setHex(0xff6600);
+      mat.emissive?.setHex(0x442200);
+    });
   }
+
+  // Запускаем таймер на удаление
+  const timeoutId = window.setTimeout(() => {
+    this.removeTarget(target);
+  }, 5000);
+  this.removalTimeouts.set(target.id, timeoutId);
+}
 
   private removeTarget(target: Target): void {
     // Удаляем таймер из мапы
